@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="RT Dates" type="PythonConfigurationType" factoryName="Python">
     <output_file path="$PROJECT_DIR$/dl/meta/rtdates.csv" />
-    <module name="rtbak" />
+    <module name="ytbak" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
     <envs>
