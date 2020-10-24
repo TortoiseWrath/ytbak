@@ -31,13 +31,13 @@ def read_dates(filename, stdout):
 				matched_id = url_match.group(1)
 				if video_id is not None and video_id != matched_id:
 					print(
-						f"Warning: no date found for video {video_id} before seeing video {matched_id}",
+						f"Warning: no date found for {video_id} before {matched_id}",
 						file=sys.stderr)
 				video_id = matched_id
 			else:
 				m = date_pattern.search(line)
 				if m:
-					videos[video_id] = f'{m.group(3)}-{m.group(1)}-{m.group(2)}'
+					videos[video_id] = f'{m.group(3)}{m.group(1)}{m.group(2)}'
 					video_id = None
 	# TODO: If video_id is on the same line as its date, we will have a bad time
 
@@ -59,8 +59,8 @@ def convert_files(files, destination, stdout):
 			videos = read_dates(filename, stdout)
 			print(f"Writing {len(videos)} videos from file {filename} to output file", file=stdout)
 			write_file(videos, destination)
-		except IOError as e:
-			print(f"Failed to open file {filename}!", e, file=sys.stderr)
+		except IOError as error:
+			print(f"Failed to open file {filename}!", error, file=sys.stderr)
 
 	print(f"Processed {len(files)} files", file=stdout)
 
@@ -68,38 +68,28 @@ def convert_files(files, destination, stdout):
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(
 		description="Match RoosterTeeth.com video URLs with subsequent upload dates in input files")
-	parser.add_argument('-o', '--output', nargs='?', help="Output file (csv)")
+	parser.add_argument('-o', '--output', help="Output file (csv)", nargs='?',
+	                    type=argparse.FileType('w'), default=sys.stdout)
 	parser.add_argument('input', nargs='+', help="Input file (html)")
 	parser.add_argument('-v', '--verbose', help="Increase verbosity", action='store_true')
 	args = parser.parse_args()
 
 	if args.verbose:
-		if args.output is not None:
+		if args.output == sys.stdout:
 			logfile = sys.stdout
 		else:
 			logfile = sys.stderr
 	else:
 		logfile = open(os.devnull, 'w')
 
-	outfile = sys.stdout
-
-	if args.output is not None:
-		try:
-			print(f"Opening output file {args.output}", file=logfile)
-			outfile = open(args.output, 'w', newline='')
-		except IOError as e:
-			print(f"Failed to open output file {args.output}", e, file=sys.stderr)
-	else:
-		print(f"Will print results to stdout", file=logfile)
-
 	exit_code = 0
 
 	try:
-		convert_files(args.input, outfile, logfile)
+		convert_files(args.input, args.output, logfile)
 	except IOError as e:
 		print(f"Fatal I/O Error!", e, file=sys.stderr)
 		exit_code = 1
 
-	outfile.close()
+	args.output.close()
 	logfile.close()
 	exit(exit_code)
