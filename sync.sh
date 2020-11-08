@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+cd dl/ || exit
+
+rsync -vaiP --remove-source-files --exclude "meta" --exclude ".git" . meta/metadata/
+git add .
+git commit -am "move old data to meta"
+
+rclone move wasabi-us:sdg-spout . --include "*.info.json" -P
+rclone ls wasabi-us:sdg-spout/ > meta/ls-us
+git add .
+git commit -am "new data from wasabi-us"
+
+rclone move wasabi-eu:eurospout . --include "*.info.json" -P
+rclone ls wasabi-eu:eurospout/ > meta/ls-eu
+git add .
+git commit -am "new data from wasabi-eu"
+
+sudo rsync -vaiP --remove-source-files --include "*/" --exclude "*" --include "*.info.json" /bucket/archives/dl/ ./
+rclone ls /bucket/archives/dl/ > meta/ls-octopus
+git add .
+git commit -am "new data from octopus"
