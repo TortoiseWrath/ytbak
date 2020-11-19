@@ -33,7 +33,7 @@ def read_vidinfo(filename):
 
 def read_alive_list(filename):
 	with open(filename, 'r') as file:
-		return set(file.readlines())
+		return set(file.read().splitlines())
 
 
 def process_vidinfo(input_vidinfo, alivelist):
@@ -44,7 +44,7 @@ def process_vidinfo(input_vidinfo, alivelist):
 
 	Videos are assumed to be identical if all of the following are true:
 	* They were uploaded within 1 day of each other
-	* Their length is within 5% + 45 seconds of the shorter length
+	* Their length is within 5% + max(45 seconds, 10%) of the shorter length
 	* Longest common substring is more than half of longer title
 
 	Preferred sources are found by:
@@ -102,6 +102,8 @@ def process_vidinfo(input_vidinfo, alivelist):
 			j = j + 1
 			if j > len(input_vidinfo) - 1:
 				break
+			if j in processed_indices:
+				continue
 			compare = input_vidinfo[j]
 
 			# Check for a date mismatch
@@ -113,7 +115,7 @@ def process_vidinfo(input_vidinfo, alivelist):
 			len2 = int(compare['Duration'])
 			min_length = min(len1, len2)
 			max_length = max(len1, len2)
-			if max_length > min_length * 1.05 + 45:
+			if max_length > min_length * 1.05 + max(45., min_length / 10):
 				continue
 
 			# Check for a title mismatch
@@ -125,6 +127,10 @@ def process_vidinfo(input_vidinfo, alivelist):
 			compare['original_row'] = j
 			matching_rows.append(compare)
 			processed_indices.add(j)
+
+		# Remove any rows with the same server, path, size
+		matching_rows = list(
+			{f"{x['Server']}/{x['Filename']}/{x['Size']}": x for x in matching_rows}.values())
 
 		# Check for inspection conditions
 		flag_already_exists = sum(1 for x in matching_rows if x['Flag'])
