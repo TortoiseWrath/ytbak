@@ -2,7 +2,7 @@
 
 This is a collection of scripts I use to archive online videos.
 
-`download1.sh` is the best one. The rest are mainly useful for specific use cases - namely, running different jobs in
+`server/download1.sh` is the best one. The rest are mainly useful for specific use cases - namely, running different jobs in
 parallel on distributed servers in the event deletion is threatened, manually organizing videos into folders and 
 entering video metadata, and picking between or merging equivalent videos from RoosterTeeth.com and their YouTube channels.
 
@@ -106,7 +106,7 @@ This backs up the log files (and other stuff in the pwd, except the dl folder) t
 Nothing runs this; I set
 up a cron job to do so on the VPS where this is running. 
 
-## Client scripts
+## Client processing scripts
 
 Once videos are downloaded, I run these locally to figure out what to do with them.
 
@@ -127,11 +127,12 @@ Workflow for RoosterTeeth videos:
   * Group,Series,Episode,Output Title,Part,Flag
 * Further process _that_ file using `categorize.py`, to decide which sources of the same video to keep and which to delete
 * Finish processing the resulting csv file manually in Excel
-* TODO: Delete unwanted files from bucket using `download.py`
-* TODO: Download flagged files from bucket using `download.py` and process them manually
-* TODO: Download, merge as applicable, and rename files using `download.py` 
-* Move files to where I want them; write certain videos to tape using `downtape.py`
-* Delete 
+* Download using the client download scripts `download.py` and `downtape.py`
+  * Delete unwanted files from bucket using `download.py`
+  * Download flagged files from bucket using `download.py` and process them manually
+  * Download, merge as applicable, and rename files using `download.py`
+  * Move files to where I want them
+  * Download the rest of the videos and write to tape using `downtape.py`
 * Periodically recheck alive videos using `check_alive`. Commit results; removed lines since last commit correspond to deleted videos
 
 In Excel 2010, utf-8 encoded csv files have to be imported using "From Text" on the data tab. This creates a 
@@ -188,9 +189,15 @@ this decides what to do with each one.
 
 The option `-t` means it treats the input files as tab-separated UTF-16 rather than comma-separated UTF-8.
 
-### download.py
+## Client download scripts
 
-This one only needs Python 3.7, not Python 3.9.
+Once I've figured out what to do with the videos with the help of the client processing scripts, these scripts are used to do the things.
+
+Dependencies: `bash`, `python` 3.7+, [`pipenv`](https://pypi.org/project/pipenv/), `rclone`, `ffmpeg`, 
+[`youtube-dl`](https://github.com/ytdl-org/youtube-dl), 
+[MKVToolNix](https://mkvtoolnix.download/downloads.html)
+
+### download.py
 
 This uses the decisions made by `categorize.py`, once I've manually inspected them, to do the following depending on which arguments are given:
 
@@ -251,11 +258,11 @@ The mappings from original filenames to renamed filenames (many-to-one, in case 
 
 (This way the metadata left behind can be matched to the stored video files later.)
 
+### downloader.py
+
+Downloader model, used by `download.py` and `downtape.py`
+
 ### downtape.py
-
-Doesn't exist yet.
-
-This one only needs Python 3.7, not Python 3.9.
 
 Note when writing this: https://unix.stackexchange.com/questions/346853/tar-list-files-break-on-first-file
 

@@ -49,6 +49,16 @@ def get_input_files(directory):
 	return [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
 
 
+"""
+Display jobs as:
+job     task   progress
+delete  copy   [xxxxxx          ] 25%
+keep    move   [xxxxxxxxxxxxxxxx] done
+keep    merge  [                ] 0%
+archive delete [xxxxxxxxxxxxxxxx] done
+
+"""
+
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(
 		description="Identify preferable versions of RoosterTeeth videos in a processed vidinfo csv file")
@@ -82,15 +92,16 @@ if __name__ == "__main__":
 	job_options = {'download': not args.delete_instead, 'delete': args.delete_instead or args.move}
 
 	if args.delete:
-		downloader.download(filter_videos(all_videos, 'delete'), download=False, delete=True)
+		downloader.download(filter_videos(all_videos, 'delete'), download=False, delete=True,
+		                    job_name='delete')
 	if args.keep:
-		downloader.download(filter_videos(all_videos, 'keep'), **job_options)
+		downloader.download(filter_videos(all_videos, 'keep'), **job_options, job_name='keep')
 	if args.archive:
-		downloader.download(filter_videos(all_videos, 'archive'), **job_options)
+		downloader.download(filter_videos(all_videos, 'archive'), **job_options, job_name='archive')
 	if args.inspect:
 		downloader.download(filter_videos(all_videos, 'inspect'), **job_options,
-		                    add_attachments=False, rename=False)
+		                    add_attachments=False, rename=False, job_name='inspect')
 	if args.merge:
-		downloader.download_and_merge(all_videos, **job_options)
+		downloader.download_and_merge(all_videos, **job_options, job_name='merge')
 
 	args.output.close()

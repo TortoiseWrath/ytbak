@@ -1,5 +1,7 @@
 import csv
+import os
 
+IMAGE_FILES = ['jpg', 'webp', 'png', 'jpeg', 'gif']
 
 def new_filename(video):
 	"""
@@ -29,7 +31,6 @@ def new_filename(video):
 	raise NotImplementedError("Dunno")
 
 
-# Downloader model
 class Downloader:
 	def __init__(self, server_map_file, output_file=None, dry_run=False):
 		"""
@@ -41,6 +42,9 @@ class Downloader:
 		self.__read_server_map(server_map_file)
 		self.output_file = output_file
 		self.dry_run = dry_run
+
+		if not os.path.exists('temp'):
+			os.makedirs('temp')
 
 		self.running_jobs = []
 
@@ -58,8 +62,51 @@ class Downloader:
 			server_map[row[0]].append(row[1])
 		self.server_map = server_map
 
-	def download(self, videos, download=True, delete=False, add_attachments=True, rename=True):
-		raise NotImplementedError("No downloading.")
+	def spawn_rclone(self, arguments, dry_run=False):
+		raise NotImplementedError("Don't know how to rclone.")
+
+	def create_filter_files(self, videos, include_thumbnails=True, include_metadata=False):
+		"""
+		Create filter files to select files from rsync.
+		:param include_metadata: Whether to include json files as well as video files
+		:param include_thumbnails: Whether to include thumbnail files as well as video files
+		:param videos: Videos to download
+		:return: dictionary mapping server name to path to relevant file
+		"""
+		raise NotImplementedError("Can't create filter file")
+
+	def download(self, videos, download=True, delete=False, add_attachments=True, rename=True,
+	             dry_run=False, job_name=None):
+		"""
+		Download videos
+		:param videos: Videos to download
+		:param download: Whether to perform the download
+		:param delete: Whether to delete the files from the server
+		:param add_attachments: Whether to add json and image files as attachments in mkv
+		:param rename: Whether to rename files to new_filename(video)
+		:param dry_run: Whether to perform a dry run
+		:param job_name: job name (optional)
+		:return: a future that completes when everything is done
+		"""
+		if download:
+			# Perform the downloading.
+			rclone_action = 'move' if delete else 'copy'
+			filter_files = self.create_filter_files(videos, include_metadata=not delete)
+			if delete:
+				# Create a second thread for just metadata files, which should not be deleted
+				raise NotImplementedError()
+			raise NotImplementedError("No downloading.")
+			if add_attachments:
+				# Monitor rclone instance and wait for files to get downloaded
+				# When mkv files are downloaded, rename and add to the job "downloaded" list
+				# When non-mkv files are downloaded, convert and add to the job "downloaded" list
+				# When videos are added to the "downloaded" list, check the "pending_attachments"
+				# list for pending attachments. If there are any, merge them.
+				# When attachments are downloaded, check whether the corresponding video file has
+				# been downloaded. If so, merge the attachment; otherwise, add them to pending.
+				raise NotImplementedError("No attaching.")
+		if delete and not download:
+			raise NotImplementedError("No deleting.")
 
 	def download_and_merge(self, videos, download=True, delete=False, add_attachments=True,
 	                       rename=True):
