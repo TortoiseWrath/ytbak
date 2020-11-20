@@ -1,6 +1,9 @@
 import argparse
 import csv
+import locale
 import sys
+
+locale.setlocale(locale.LC_ALL, '')
 
 
 # https://en.wikibooks.org/wiki/Algorithm_Implementation/Strings/Longest_common_substring#Python
@@ -19,21 +22,57 @@ def longest_common_substring(s1, s2):
 	return s1[x_longest - longest: x_longest]
 
 
-def read_vidinfo(filename):
-	with open(filename, 'r', newline='', encoding='cp1252') as csvfile:
-		reader = csv.DictReader(csvfile)
+def read_vidinfo(filename, tab_separated):
+	with open(filename, 'r', newline='',
+	          encoding='utf-16' if tab_separated else 'utf-8') as csvfile:
+		reader = csv.DictReader(csvfile, dialect='excel-tab' if tab_separated else 'excel')
 		videos = list(reader)
-	for expected_key in 'Website', 'Size', 'ID', 'Title', 'Date', 'Duration', 'Subtitles', \
-	                    'Height', 'Total bitrate', 'Group', 'Series', 'Episode', 'Output Title', \
-	                    'Part', 'Flag':
+	for expected_key in 'Server', 'Filename', 'Size', 'Website', 'ID', 'Channel', 'Title', 'Date', \
+	                    'Duration', 'Subtitles', 'Height', 'Group', 'Series', 'Episode', \
+	                    'Output Title', 'Part', 'Flag', 'Audio bitrate', 'Video codec', 'Audio codec':
 		if expected_key not in videos[0]:
-			raise ValueError(f"Did not find key {expected_key} in vidinfo csv")
+			raise ValueError(f"Did not find key {expected_key} in vidinfo csv. values: {videos[0]}")
 	return videos
 
 
 def read_alive_list(filename):
 	with open(filename, 'r') as file:
 		return set(file.read().splitlines())
+
+
+def quality(video_info):
+	"""
+	Estimate the H.264 equivalent bitrate for a given video
+	:param video_info: video info dictionary
+	:return: bitrate in kbps
+	"""
+
+	# TODO: The bitrate calculation currently in vidinfo.py yields broken results when compared
+	# to bitrates explicitly specified in info.json.
+	# When audio bitrate is given, it is correct.
+	# For now, need to use just the file size, duration, audio codec and bitrate, and video codec.
+
+	if not video_info['Size']:
+		return 0
+
+	# These are integers in case the file size is big.
+	# Once we have total bitrate (a smallish number), casting it to float later is fine
+	file_size_kbits = locale.atoi((video_info['Size'] or '0').strip()) * 8 // 1000
+	total_bitrate = file_size_kbits // int(video_info['Duration'])
+
+	# In a small sample of RoosterTeeth videos with unknown audio bitrate using AAC (mp4a.*), the
+	# audio bitrate was usually about 128 kbps. Otherwise, assume it's 160 kbps unless specified.
+	audio_bitrate = int(video_info['Audio bitrate'] or (
+		128 if (video_info['Audio codec'] or '').startswith('mp4a.') else 160))
+
+	approximate_video_bitrate = total_bitrate - audio_bitrate
+
+	# H.264 (avc1.*) needs about 50% more bitrate than AV1 (av01.*), VP9 (vp9), H.264 (hvc1.*):
+	# https://blogs.gnome.org/rbultje/2015/09/28/vp9-encodingdecoding-performance-vs-hevch-264/
+	if (video_info['Video codec'] or '').startswith(('av01.', 'vp9', 'hvc1.')):
+		approximate_video_bitrate *= 1.5
+
+	return approximate_video_bitrate
 
 
 def process_vidinfo(input_vidinfo, alivelist):
@@ -50,8 +89,8 @@ def process_vidinfo(input_vidinfo, alivelist):
 	Preferred sources are found by:
 	1. File exists (size is not blank)
 	2. Video height
-	3. Bitrate
-	4. Default to preferring YT video if before 2019-01-01, else RT video
+	3. Quality (assumed from total bitrate and video codec)
+	4. For AH videos: default to preferring YT video if before 2019-01-01, else RT video
 
 	The result is "inspect" if:
 	* Flag already exists in flag column
@@ -62,6 +101,7 @@ def process_vidinfo(input_vidinfo, alivelist):
 	If one has subtitles and the other doesn't, the results are "subs" and "audio+video"
 	If both apply, the results are "audio+subs" and "video" or "audio" and "video+subs"
 	If the size is blank, the result is "ignore"
+	BUT: If any have different length, results are "keep_video" and "archive_audio", etc.
 	Otherwise, the results are "keep" and "delete"
 
 	The column "alive" says whether the video is still up on YT.
@@ -164,20 +204,24 @@ def process_vidinfo(input_vidinfo, alivelist):
 		# Default preference
 		youtube_preferred = earlier_date < 20180101
 
-		# Compare bitrates
-		if float(youtube_video['Total bitrate']) < float(roosterteeth_video['Total bitrate']):
+		# Compare video resolution
+		if int(youtube_video['Height']) < int(roosterteeth_video['Height']):
 			youtube_preferred = False
-		elif float(roosterteeth_video['Total bitrate']) < float(youtube_video['Total bitrate']):
+		elif int(roosterteeth_video['Height']) > int(roosterteeth_video['Height']):
 			youtube_preferred = True
+		else:
+			# Compare video quality
+			# Quality is in approximate H.264 equivalent bitrate in kbps; allow a tolerance of 10%
+			quality_ratio = quality(youtube_video) / quality(roosterteeth_video)
+			if quality_ratio < (1 / 1.1):
+				youtube_preferred = False
+			elif quality_ratio > 1.1:
+				youtube_preferred = True
 
-		# Compare video heights
-		if youtube_video['Height'] < roosterteeth_video['Height']:
-			youtube_preferred = False
-		elif roosterteeth_video['Height'] > roosterteeth_video['Height']:
-			youtube_preferred = True
-
-		# Check for YT preferred after 20191001 to avoid censored audio
-		merge_videos = youtube_preferred and earlier_date >= 20191001
+		# Check for AH videos with YT preferred after 20191001 to avoid censored audio
+		is_achievement_hunter = any(
+			x['Channel'] in ['Achievement Hunter', 'LetsPlay'] for x in matching_rows)
+		merge_videos = youtube_preferred and is_achievement_hunter and earlier_date >= 20191001
 
 		# Video A has preferred video feed; video B may have preferred other stuff
 		video_a = youtube_video if youtube_preferred else roosterteeth_video
@@ -192,6 +236,20 @@ def process_vidinfo(input_vidinfo, alivelist):
 			video_a['result'] = 'audio+video' if subs_from_b else 'keep'
 			video_b['result'] = 'subs' if subs_from_b else 'delete'
 
+		# Avoid merging audio and video tracks of disparate length
+		# keep both audio tracks too just in case
+		if video_a['result'] != 'keep' and abs(
+				int(video_a['Duration']) - int(video_b['Duration'])) > 2:
+			# Keep the one with the preferred audio (video_b) if merging because one might be
+			# censored; otherwise, keep the one with the preferred video (video_a)
+			video_a['result'] = ('archive_' if merge_videos else 'keep_') + video_a['result']
+			video_b['result'] = ('keep_' if merge_videos else 'archive_') + video_b['result']
+
+		video_a['other_server'] = video_b['Server']
+		video_a['other_path'] = video_b['Filename']
+		video_b['other_server'] = video_a['Server']
+		video_b['other_path'] = video_a['Filename']
+
 		# Merge manually entered metadata
 		for metadata_key in ['Group', 'Series', 'Episode', 'Output Title', 'Part', 'Flag']:
 			values[metadata_key] = video_a[metadata_key] or video_b[metadata_key] or next(
@@ -205,7 +263,8 @@ def process_vidinfo(input_vidinfo, alivelist):
 
 def write_vidinfo(vidinfo_dict, csvfile):
 	fieldnames = list(vidinfo_dict[0])
-	for extra_name in 'rt_id', 'yt_id', 'alive', 'original_row', 'result':
+	for extra_name in 'rt_id', 'yt_id', 'alive', 'original_row', 'result', \
+	                  'other_path', 'other_server':
 		if extra_name not in fieldnames:
 			fieldnames.append(extra_name)
 	writer = csv.DictWriter(csvfile, fieldnames)
@@ -220,9 +279,11 @@ if __name__ == "__main__":
 	parser.add_argument('-o', '--output', help="output file", nargs='?',
 	                    type=argparse.FileType('w'), default=sys.stdout)
 	parser.add_argument('-a', '--alive-list', help="file listing still-alive video ids")
+	parser.add_argument('-t', '--tab-separated', action='store_true',
+	                    help="Use a tab-separated UTF-16 input file instead of UTF-8 csv")
 	args = parser.parse_args()
 
-	vidinfo = read_vidinfo(args.source)
+	vidinfo = read_vidinfo(args.source, args.tab_separated)
 	alive_videos = read_alive_list(args.alive_list)
 	vidinfo = process_vidinfo(vidinfo, alive_videos)
 	write_vidinfo(vidinfo, args.output)

@@ -62,6 +62,8 @@ class VideoMetadata:
 		if video_format is not None:
 			video_format = [x for x in info.get('formats', []) if x['format_id'] == video_format][0]
 
+		# TODO: bitrate calculation is fucked up
+
 		try:
 			self.abr = info.get('abr', None) or audio_format.get('abr', None)
 			self.vbr = info.get('vbr', None) or video_format.get('vbr', None)

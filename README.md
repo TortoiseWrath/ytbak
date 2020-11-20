@@ -126,13 +126,18 @@ Workflow for RoosterTeeth videos:
 * Open the csv file in Excel, add and populate these columns, and save as another csv file:
   * Group,Series,Episode,Output Title,Part,Flag
 * Further process _that_ file using `categorize.py`, to decide which sources of the same video to keep and which to delete
-* Finish processing the resulting csv file manually
+* Finish processing the resulting csv file manually in Excel
 * TODO: Delete unwanted files from bucket using `download.py`
 * TODO: Download flagged files from bucket using `download.py` and process them manually
 * TODO: Download, merge as applicable, and rename files using `download.py` 
 * Move files to where I want them; write certain videos to tape using `downtape.py`
 * Delete 
 * Periodically recheck alive videos using `check_alive`. Commit results; removed lines since last commit correspond to deleted videos
+
+In Excel 2010, utf-8 encoded csv files have to be imported using "From Text" on the data tab. This creates a 
+data connection; you can copy the imported data to another worksheet then import new data from an updated vidinfo.csv 
+file by refreshing the connection. Then, save the updated worksheet as "Unicode Text (*.txt)" for processing by
+categorize.py, download.py, and downtape.py and pass `-t` to these scripts to handle tab-separated files.
 
 ### download_server_metadata
 
@@ -174,12 +179,14 @@ top-10-wii-games,Rooster Teeth
 This parses the HTML file that I get from copying a fully-loaded video listing from RoosterTeeth.com and pasting it into MS Word and saving it as HTML
 to determine the upload date corresponding to each video id.
 
-This creates a `date-map` that can be used by `vidinfo.py`
+This creates a `date-map` that can be used by `vidinfo.py`.
 
 ### categorize.py
 
 Where both YT and RT sources exist for a video in a `vidinfo.csv` file (the output of `vidinfo.py`, plus additional columns as noted above),
 this decides what to do with each one.
+
+The option `-t` means it treats the input files as tab-separated UTF-16 rather than comma-separated UTF-8.
 
 ### download.py
 
@@ -191,14 +198,14 @@ This uses the decisions made by `categorize.py`, once I've manually inspected th
 
 * `-d`: Deletes files in the input with the result `delete`
 * `-D`: Deletes files in the input csv from the server that would otherwise be downloaded
-* `-k`: Downloads files with the result `keep`
+* `-k`: Downloads files with the results `keep`, `keep_audio`, etc.
+* `-a`: Downloads files with the results `archive_audio`, `archive_video+subs`, etc.
 * `-i`: Downloads files with the result `inspect`
 * `-m`: Downloads and merges files with the results `audio`, `audio+subs`, `video`, `video+subs`, `audio+video`, and `subs`
+* `-t`: Interpret the input files as tab-separated UTF-16 rather than comma-separated UTF-8.
 
-You can prevent certain files from being deleted on the server when using `--delete-instead` by adding a `Keep` column to 
-the CSV file and populating it with a truthy value for these files.
-
-To download files and delete them, run for example `download.py -k` followed by `download.py -Dk`.
+To download files and delete them from the server, run for example `download.py -k` followed by `download.py -Dk`.
+ `downtape.py` does this, with a `writetape` in the middle.
 
 The server is found from the `Server` column in the csv file. Pass `--server-map` to `categorize.py`, which should 
 map server names to rclone server names (one-to-many):
@@ -215,6 +222,8 @@ If you've used `download_server_metadata`, make sure to include the new location
 
 The thumbnail and info.json are added as attachments to the mkv file after it is downloaded. 
 (non-mkv video files are remuxed into an mkv file)
+
+If `other_server` and `other_path` are given in the csv, it will include thumbnails and info.json from those too. 
 
 Thumbnail files are deleted by `-d` and `-D`, but info.json files are not.
 
@@ -268,6 +277,13 @@ After writing a tape, it ejects the tape, deletes the files from the server with
 Before writing a tape, it makes sure the tape is blank. If the tape is not blank, it prompts and waits.
 
 If free disk space drops below 1 TB, it stops downloading until enough tapes have been written that the free space is at least 1.5 TB. (this makes sense because I'm using LTO-3 tapes at the moment)
+
+The option `-t` means it treats the input files as tab-separated UTF-16 rather than comma-separated UTF-8.
+
+If `--copy-dead-to` is specified, files with alive=False (or a non-None falsy value) in the input file are copied to the specified destination 
+before writing to tape. The destination specified is passed to rclone so should be in rclone format.
+
+Note: Budget 250 KB extra per video on the tape, for thumbnails + info.json + overhead
 
 ## Credits & license
 
