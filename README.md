@@ -190,24 +190,23 @@ The option `-t` means it treats the input files as tab-separated UTF-16 rather t
 
 ### download.py
 
-Doesn't exist yet.
-
 This one only needs Python 3.7, not Python 3.9.
 
 This uses the decisions made by `categorize.py`, once I've manually inspected them, to do the following depending on which arguments are given:
 
 * `-d`: Deletes files in the input with the result `delete`
 * `-D`: Deletes files in the input csv from the server that would otherwise be downloaded
+* `-M`: Deletes files from the server after downloading them
 * `-k`: Downloads files with the results `keep`, `keep_audio`, etc.
 * `-a`: Downloads files with the results `archive_audio`, `archive_video+subs`, etc.
 * `-i`: Downloads files with the result `inspect`
 * `-m`: Downloads and merges files with the results `audio`, `audio+subs`, `video`, `video+subs`, `audio+video`, and `subs`
 * `-t`: Interpret the input files as tab-separated UTF-16 rather than comma-separated UTF-8.
 
-To download files and delete them from the server, run for example `download.py -k` followed by `download.py -Dk`.
+To download files and delete them from the server, run for example `download.py -k` followed by `download.py -Dk`, or run `download.py -Mk`.
  `downtape.py` does this, with a `writetape` in the middle.
 
-The server is found from the `Server` column in the csv file. Pass `--server-map` to `categorize.py`, which should 
+The server is found from the `Server` column in the csv file. Pass `--server-map`, which should 
 map server names to rclone server names (one-to-many):
 ```
 octopus,/bucket/archives/dl
@@ -250,7 +249,7 @@ The output filename is decided by the additional metadata fields in the csv. It 
 
 The mappings from original filenames to renamed filenames (many-to-one, in case of `-m`) in a log file specified by `-o`.
 
-(This way the metadata and thumbnail images which are left behind can be matched to the stored video files later.)
+(This way the metadata left behind can be matched to the stored video files later.)
 
 ### downtape.py
 

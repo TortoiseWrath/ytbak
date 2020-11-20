@@ -275,7 +275,7 @@ def write_vidinfo(vidinfo_dict, csvfile):
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(
 		description="Identify preferable versions of RoosterTeeth videos in a processed vidinfo csv file")
-	parser.add_argument('source', help="vidinfo csv file", nargs='?')
+	parser.add_argument('source', help="vidinfo csv file")
 	parser.add_argument('-o', '--output', help="output file", nargs='?',
 	                    type=argparse.FileType('w'), default=sys.stdout)
 	parser.add_argument('-a', '--alive-list', help="file listing still-alive video ids")
