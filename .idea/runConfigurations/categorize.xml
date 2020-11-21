@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Categorize" type="PythonConfigurationType" factoryName="Python">
+  <configuration default="false" name="categorize" type="PythonConfigurationType" factoryName="Python">
     <module name="client_processing" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />

@@ -1,11 +1,11 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "a36a5392bb1e8bbc06bfaa0761e52593cf2d83b486696bf54667ba8da616c839"
+            "sha256": "27bb78c70646521877d738212be4389dc8d628d150988a58cbde5a022862216a"
         },
         "pipfile-spec": 6,
         "requires": {
-            "python_version": "3.9"
+            "python_version": "3.7"
         },
         "sources": [
             {
@@ -15,6 +15,14 @@
             }
         ]
     },
-    "default": {},
+    "default": {
+        "aiopubsub": {
+            "hashes": [
+                "sha256:e75aae34d43506967dd92ce792995b8e815ddb31d42a114260036892d8693e91"
+            ],
+            "index": "pypi",
+            "version": "==2.1.5"
+        }
+    },
     "develop": {}
 }

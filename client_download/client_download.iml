@@ -3,7 +3,7 @@
   <component name="NewModuleRootManager" inherit-compiler-output="true">
     <exclude-output />
     <content url="file://$MODULE_DIR$" />
-    <orderEntry type="jdk" jdkName="Python 3.9 (rtbak)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Remote Python 3.7.9 (sftp://tortoise@10.0.0.10:22/home/tortoise/.local/share/virtualenvs/client_download-XEjgGt6L/bin/python)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>

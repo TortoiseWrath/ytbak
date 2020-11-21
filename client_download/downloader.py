@@ -99,7 +99,8 @@ class Downloader:
 			server_map[row[0]].append(row[1])
 		self.server_map = server_map
 
-	def __create_filter_files(self, videos, include_thumbnails=True, include_metadata=False):
+	def __create_filter_files(self, videos, include_videos=True, include_thumbnails=True,
+	                          include_metadata=False):
 		"""
 		Create filter files to select files from rsync.
 		:param include_metadata: Whether to include json files as well as video files
@@ -109,45 +110,60 @@ class Downloader:
 		"""
 		raise NotImplementedError("Can't create filter file")
 
-	def spawn_rclone(self, arguments, dry_run=False):
+	def run_rclone(self, server, destination, action, filter_file, dry_run=False):
 		raise NotImplementedError("Don't know how to rclone.")
 
-	def download(self, videos, download=True, delete=False, add_attachments=True, rename=True,
-	             dry_run=False, job_name=None):
+	def download(self, videos, download=True, delete=False, dry_run=False, destination='.',
+	             job_name=None):
 		"""
 		Download videos
 		:param videos: Videos to download
 		:param download: Whether to perform the download
 		:param delete: Whether to delete the files from the server
-		:param add_attachments: Whether to add json and image files as attachments in mkv
-		:param rename: Whether to rename files to new_filename(video)
 		:param dry_run: Whether to perform a dry run
 		:param job_name: job name (optional)
-		:return: a future that completes when everything is done
+		:param destination: download destination
+		:return: a future that completes when downloads are complete
 		"""
 		if download:
 			rclone_action = 'move' if delete else 'copy'
 			filter_files = self.__create_filter_files(videos, include_metadata=not delete)
-			path_map = filename_map(videos, rename=rename)
+			for server, filter_file in filter_files.items():
+				for rclone_server in self.server_map[server]:
+					self.run_rclone(rclone_server, destination, rclone_action, filter_file,
+					                dry_run=dry_run)
 			if delete:
-				# Create a second thread for just metadata files, which should not be deleted
-				raise NotImplementedError()
-			raise NotImplementedError("No downloading.")
-			if add_attachments:
-				# Monitor rclone instance and wait for files to get downloaded
-				# When mkv files are downloaded, rename and add to the job "downloaded" list
-				# When non-mkv files are downloaded, convert and add to the job "downloaded" list
-				# When videos are added to the "downloaded" list, check the "pending_attachments"
-				# list for pending attachments. If there are any, merge them.
-				# When attachments are downloaded, check whether the corresponding video file has
-				# been downloaded. If so, merge the attachment; otherwise, add them to pending.
-				raise NotImplementedError("No attaching.")
-		if delete and not download:
+				# Get just metadata files, which should not be deleted
+				metadata_filter_files = self.__create_filter_files(videos, include_videos=False,
+				                                                   include_thumbnails=False,
+				                                                   include_metadata=True)
+				for server, filter_file in metadata_filter_files.items():
+					for rclone_server in self.server_map[server]:
+						self.run_rclone(rclone_server, destination, 'copy', filter_file,
+						                dry_run=dry_run)
+		elif delete:
 			filter_files = self.__create_filter_files(videos, include_metadata=False)
+			for server, filter_file in filter_files.items():
+				for rclone_server in self.server_map[server]:
+					self.run_rclone(rclone_server, 'delete', filter_file, dry_run=dry_run)
 			raise NotImplementedError("No deleting.")
 
+	def merge_and_rename(self, videos, add_attachments=True, merge=True, rename=True, dry_run=False,
+	                     job_name=None):
+		"""
+		Merge and rename downloaded videos according to the rules suggested by videos
+		:param videos:
+		:param add_attachments: Whether to add attachments to the downloaded file
+		:param merge: Whether to merge downloaded video files according to the "result" column
+		:param rename: Whether to rename files to new_filename(video)
+		:param dry_run: Whether to perform a dry run
+		:param job_name: job name (optional)
+		:return: 
+		"""
+		path_map = filename_map(videos, rename=rename)
+
 	def download_and_merge(self, videos, download=True, delete=False, add_attachments=True,
-	                       rename=True):
+	                       rename=True, job_name=None):
 		"""
 		Download only those videos that require stream merging, and merge the streams
 		:param videos: A list of video dictionaries
@@ -155,6 +171,7 @@ class Downloader:
 		:param delete: Whether to delete the files from the server
 		:param add_attachments: Whether to add json and image files as attachments in mkv
 		:param rename: Whether to rename files to new_filename(video)
+		:param job_name: Job name (optional)
 		:return: a job?  # TODO: what
 		"""
 		raise NotImplementedError("No downloading and especially no merging.")
@@ -167,7 +184,15 @@ def read_source_file(filename, tsv=False):
 	:param tsv: The type of file: false for UTF-8 CSV, true for UTF-16 TSV
 	:return: A list of video dictionaries
 	"""
-	raise NotImplementedError("No reading.")
+	with open(filename, 'r', newline='',
+	          encoding='utf-16' if tsv else 'utf-8') as csvfile:
+		reader = csv.DictReader(csvfile, dialect='excel-tab' if tsv else 'excel')
+		videos = list(reader)
+	for expected_key in 'Server', 'Filename', 'Size', 'Date', 'Duration', 'Group', 'Series', \
+	                    'Episode', 'Output Title', 'Part', 'result', 'other_path', 'other_server':
+		if expected_key not in videos[0]:
+			raise ValueError(f"Did not find key {expected_key} in vidinfo csv. values: {videos[0]}")
+	return videos
 
 
 def filter_videos(all_videos, *expected_result_classes):

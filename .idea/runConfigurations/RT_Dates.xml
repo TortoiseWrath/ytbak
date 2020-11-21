@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="RT Dates" type="PythonConfigurationType" factoryName="Python">
+  <configuration default="false" name="RT Dates" type="PythonConfigurationType" factoryName="Python" folderName="rtdates">
     <output_file path="$PROJECT_DIR$/dl/meta/rtdates.csv" />
     <module name="client_processing" />
     <option name="INTERPRETER_OPTIONS" value="" />
