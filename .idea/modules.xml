@@ -2,6 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/client_download/client_download.iml" filepath="$PROJECT_DIR$/client_download/client_download.iml" />
       <module fileurl="file://$PROJECT_DIR$/client_processing/client_processing.iml" filepath="$PROJECT_DIR$/client_processing/client_processing.iml" />
       <module fileurl="file://$PROJECT_DIR$/server/server.iml" filepath="$PROJECT_DIR$/server/server.iml" />
       <module fileurl="file://$PROJECT_DIR$/ytbak.iml" filepath="$PROJECT_DIR$/ytbak.iml" />

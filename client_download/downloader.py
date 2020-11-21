@@ -3,6 +3,25 @@ import os
 
 IMAGE_FILES = ['jpg', 'webp', 'png', 'jpeg', 'gif']
 
+
+def remove_ext(path):
+	first = os.path.splitext(path)
+	# handle .info.json, .rechat.json, etc.
+	if first[1] == '.json':
+		second = os.path.splitext(path)
+		return second[0] if 3 <= len(second[1]) <= 8 else first[0]
+	return first[0]
+
+
+def ext(path):
+	first = os.path.splitext(path)
+	# handle .info.json, .rechat.json, etc.
+	if first[1] == '.json':
+		second = os.path.splitext(path)
+		return second[1] + first[1] if 3 <= len(second[1]) <= 8 else first[1]
+	return first[1]
+
+
 def new_filename(video):
 	"""
 	Determine the appropriate output filename for a video. It can be in any of these formats:
@@ -25,10 +44,28 @@ def new_filename(video):
 	{Group}/{Date} - Episode {Episode} - Part {Part}
 	{Group}/{Date} - Episode {Episode} - {Output Title} - Part {Part}
 	It does NOT include the file extension!
+	If none can be determined
 	:param video:
 	:return: The path where the video should be placed after being downloaded, without extension
 	"""
 	raise NotImplementedError("Dunno")
+
+
+def filename_map(videos, rename=True):
+	"""
+	Create a filename mapping from old paths to new paths according to new_filename,
+	excluding file extensions.
+	:param videos: List of videos
+	:param rename: If false, this only deals with other_path.
+	:return: a dictionary
+	"""
+	path_map = {
+		remove_ext(v['Filename']): (new_filename(v) if rename else remove_ext(v['Filename']))
+		for v in videos}
+	path_map.update({
+		remove_ext(v['other_path']): path_map[remove_ext(v['Filename'])]
+		for v in videos})
+	return path_map
 
 
 class Downloader:
@@ -62,10 +99,7 @@ class Downloader:
 			server_map[row[0]].append(row[1])
 		self.server_map = server_map
 
-	def spawn_rclone(self, arguments, dry_run=False):
-		raise NotImplementedError("Don't know how to rclone.")
-
-	def create_filter_files(self, videos, include_thumbnails=True, include_metadata=False):
+	def __create_filter_files(self, videos, include_thumbnails=True, include_metadata=False):
 		"""
 		Create filter files to select files from rsync.
 		:param include_metadata: Whether to include json files as well as video files
@@ -74,6 +108,9 @@ class Downloader:
 		:return: dictionary mapping server name to path to relevant file
 		"""
 		raise NotImplementedError("Can't create filter file")
+
+	def spawn_rclone(self, arguments, dry_run=False):
+		raise NotImplementedError("Don't know how to rclone.")
 
 	def download(self, videos, download=True, delete=False, add_attachments=True, rename=True,
 	             dry_run=False, job_name=None):
@@ -89,9 +126,9 @@ class Downloader:
 		:return: a future that completes when everything is done
 		"""
 		if download:
-			# Perform the downloading.
 			rclone_action = 'move' if delete else 'copy'
-			filter_files = self.create_filter_files(videos, include_metadata=not delete)
+			filter_files = self.__create_filter_files(videos, include_metadata=not delete)
+			path_map = filename_map(videos, rename=rename)
 			if delete:
 				# Create a second thread for just metadata files, which should not be deleted
 				raise NotImplementedError()
@@ -106,6 +143,7 @@ class Downloader:
 				# been downloaded. If so, merge the attachment; otherwise, add them to pending.
 				raise NotImplementedError("No attaching.")
 		if delete and not download:
+			filter_files = self.__create_filter_files(videos, include_metadata=False)
 			raise NotImplementedError("No deleting.")
 
 	def download_and_merge(self, videos, download=True, delete=False, add_attachments=True,
