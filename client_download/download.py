@@ -1,11 +1,10 @@
-# import argparse
 import aiopubsub
+import argparse
 import asyncio
 import os
-import random
 
-
-# from downloader import Downloader, filter_videos, read_source_file
+import view
+from downloader import Downloader, filter_videos, read_source_file
 
 
 # * `-d`: Deletes files in the input with the result `delete`
@@ -43,114 +42,73 @@ import random
 #
 # (This way the metadata left behind can be matched to the stored video files later.)
 
-def get_input_files(directory):
-	"""
-	Get a list of files in the directory
-	:param directory: The path to the directory
-	:return: list of files
-	"""
-	return [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+async def download(args, hub):
+	downloader = Downloader(hub=hub, prefix='dl', output_dir=args.output,
+	                        output_file=args.map_output,
+	                        server_map_file=args.server_map, dry_run=args.dry_run)
+	all_videos = read_source_file(filename=args.source, tsv=args.tab_separated)
+	args.server_map.close()
+
+	job_options = {'download': not args.delete_instead, 'delete': args.delete_instead or args.move}
+
+	tasks = []
+
+	if args.delete:
+		tasks.append(downloader.download(filter_videos(all_videos, 'delete'),
+		                                 download=False, delete=True, keys=['delete']))
+	# if args.keep:
+	# 	downloader.download(filter_videos(all_videos, 'keep'), **job_options, job_name='keep')
+	# if args.archive:
+	# 	downloader.download(filter_videos(all_videos, 'archive'), **job_options, job_name='archive')
+	# if args.inspect:
+	# 	downloader.download(filter_videos(all_videos, 'inspect'), **job_options,
+	# 	                    add_attachments=False, rename=False, job_name='inspect')
+	# if args.merge:
+	# 	downloader.download_and_merge(all_videos, **job_options, job_name='merge')
+
+	await asyncio.gather(*tasks)
+
+	args.map_output.close()
+	args.log_output.close()
 
 
-"""
-[delete:copy] running: rclone -copy --filter-file temp/3958-adsf
-[delete] Downloaded file: ....
-[delete] Merging files:
-* audio from ....
-* video from ....
-[keep] Remuxing file: ....
-[keep] Adding attachment .... to ....
-[keep:merge_102] running: ffmpeg blah blah blah
--------------------------------------------------------------------
-job     progress
-delete  [xxxxxx          ] 25%
-keep    [xxxxxxxxxxxxxxxx] done
+def main():
+	parser = argparse.ArgumentParser(
+		description="Identify preferable versions of RoosterTeeth videos in a processed vidinfo csv file")
+	parser.add_argument('source', help="vidinfo csv file")
+	parser.add_argument('-d', '--delete', action='store_true',
+	                    help='Delete files with the result "delete"')
+	parser.add_argument('-D', '--delete-instead', action='store_true',
+	                    help='Delete files that would otherwise be downloaded')
+	parser.add_argument('-M', '--move', action='store_true', help='Delete files after downloading')
+	parser.add_argument('-k', '--keep', action='store_true',
+	                    help='Download files with the results "keep", "keep_*"')
+	parser.add_argument('-a', '--archive', action='store_true',
+	                    help='Download files with the result "archive", "archive_*"')
+	parser.add_argument('-i', '--inspect', action='store_true',
+	                    help='Download files with the result "inspect"')
+	parser.add_argument('-m', '--merge', action='store_true',
+	                    help='Download and merge files with the results "audio", "video+subs", etc.')
+	parser.add_argument('-t', '--tab-separated', action='store_true',
+	                    help='Interpret input file as UTF-16 TSV rather than UTF-8 CSV')
+	parser.add_argument('--map-output', nargs='?', type=argparse.FileType('a'), default=os.devnull,
+	                    help="log file with mappings from original filenames to renamed filenames")
+	parser.add_argument('--log-output', help="log file with all output (will be overwritten)",
+	                    nargs='?', type=argparse.FileType('w'), default=os.devnull)
+	parser.add_argument('-o', '--output')
+	parser.add_argument('-n', '--dry-run', action='store_true',
+	                    help="Perform a dry run")
+	parser.add_argument('--server-map', help="Server map CSV file", type=argparse.FileType('r'))
 
-"""
-
-
-async def send_four_numbers(key, pub):
-	pub.publish(key, 1)
-	await asyncio.sleep(random.randint(1, 5))
-	pub.publish(key, 2)
-	await asyncio.sleep(random.randint(1, 5))
-	pub.publish(key, 3)
-	await asyncio.sleep(random.randint(1, 5))
-	pub.publish(key, 4)
-
-
-def print_message(key, message):
-	print(f"[{key}] {message}")
-
-
-async def await_and_print(task, msg):
-	await task
-	print(msg)
-
-
-async def main():
-	task1 = asyncio.create_task(send_four_numbers(aiopubsub.Key('a'), publisher))
-	task2 = asyncio.create_task(send_four_numbers(aiopubsub.Key('b'), publisher))
-	task1b = asyncio.create_task(await_and_print(task1, "A is done!"))
-	task2b = asyncio.create_task(await_and_print(task2, "B is done"))
-	await task1b
-	await task2b
+	args = parser.parse_args()
+	hub = aiopubsub.Hub()
+	ui = view.DownloadView(logfile=args.log_output, hub=hub)
+	# TODO: Detect pipe and run without curses
+	try:
+		asyncio.run(download(args, hub))
+	finally:
+		del ui
 
 
 if __name__ == "__main__":
-	# Quick check to see where I am
-	os.system("pwd")
-	hub = aiopubsub.Hub()
-	subscriber = aiopubsub.Subscriber(hub, 'subscriber')
-	publisher = aiopubsub.Publisher(hub, prefix=aiopubsub.Key('msg'))
-	subscriber.add_sync_listener(aiopubsub.Key('msg', '*'), print_message)
-	asyncio.run(main())
-
-# parser = argparse.ArgumentParser(
-# 	description="Identify preferable versions of RoosterTeeth videos in a processed vidinfo csv file")
-# parser.add_argument('source', help="vidinfo csv file")
-# parser.add_argument('-d', '--delete', action='store_true',
-#                     help='Delete files with the result "delete"')
-# parser.add_argument('-D', '--delete-instead', action='store_true',
-#                     help='Delete files that would otherwise be downloaded')
-# parser.add_argument('-M', '--move', action='store_true', help='Delete files after downloading')
-# parser.add_argument('-k', '--keep', action='store_true',
-#                     help='Download files with the results "keep", "keep_*"')
-# parser.add_argument('-a', '--archive', action='store_true',
-#                     help='Download files with the result "archive", "archive_*"')
-# parser.add_argument('-i', '--inspect', action='store_true',
-#                     help='Download files with the result "inspect"')
-# parser.add_argument('-m', '--merge', action='store_true',
-#                     help='Download and merge files with the results "audio", "video+subs", etc.')
-# parser.add_argument('-t', '--tab-separated', action='store_true',
-#                     help='Interpret input file as UTF-16 TSV rather than UTF-8 CSV')
-# parser.add_argument('-o', '--output', help="log file with mappings from original filenames to "
-#                                            "renamed filenames", nargs='?',
-#                     type=argparse.FileType('a'))
-# parser.add_argument('-n', '--dry-run', action='store_true',
-#                     help="Perform a dry run")
-# parser.add_argument('--server-map', help="Server map CSV file", type=argparse.FileType('r'))
-# args = parser.parse_args()
-#
-# downloader = Downloader(output_file=args.output, server_map_file=args.server_map)
-# all_videos = read_source_file(filename=args.source, tsv=args.tab_separated)
-# args.source.close()
-# args.server_map.close()
-#
-# job_options = {'download': not args.delete_instead, 'delete': args.delete_instead or args.move,
-#                'dry_run':  args.dry_run}
-#
-# if args.delete:
-# 	downloader.download(filter_videos(all_videos, 'delete'), download=False, delete=True,
-# 	                    job_name='delete', dry_run=args.dry_run)
-# if args.keep:
-# 	downloader.download(filter_videos(all_videos, 'keep'), **job_options, job_name='keep')
-# if args.archive:
-# 	downloader.download(filter_videos(all_videos, 'archive'), **job_options, job_name='archive')
-# if args.inspect:
-# 	downloader.download(filter_videos(all_videos, 'inspect'), **job_options,
-# 	                    add_attachments=False, rename=False, job_name='inspect')
-# if args.merge:
-# 	downloader.download_and_merge(all_videos, **job_options, job_name='merge')
-#
-# args.output.close()
+	main()

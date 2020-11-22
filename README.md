@@ -59,9 +59,9 @@ The downloads are taken from batch files in `download1.txt` through `download4.t
 overlap between these, both across files and across servers. 
 For example, you could put some playlists/videos/channels in `download2.txt` and others in 
 `download4.txt`, where not many videos are in playlists in both files.
-Or when using multiple servers, put one channel in `download1.txt` one one server and another channel in `download1.txt` 
+Or when using multiple servers, put one channel in `download1.txt` on one server and another channel in `download1.txt` 
 on the other server.
-Otherwise files can get downloaded twice. 
+Otherwise, files can get downloaded twice. 
 (This is mitigated slightly by the use of `merge.sh`.)
 
 These output logs to `download1.log` through `download4.log`.
@@ -90,7 +90,7 @@ This uploads downloaded videos to the s3 bucket using rclone. Videos currently b
 This downloads archive files from each server's backups and merges them, so instances of youtube-dl started after this
 will not download files that were already downloaded by another instance.
 
-Currently it's only set up to do it for archive and archive3, as I was manually splitting individual videos into the
+Currently, it's only set up to do it for archive and archive3, as I was manually splitting individual videos into the
 download2.txt and download4.txt files on each server.
 
 ### mount.sh
@@ -197,6 +197,8 @@ Dependencies: `bash`, `python` 3.7+, [`pipenv`](https://pypi.org/project/pipenv/
 [`youtube-dl`](https://github.com/ytdl-org/youtube-dl), 
 [MKVToolNix](https://mkvtoolnix.download/downloads.html)
 
+Set up venv with `pipenv install`
+
 ### download.py
 
 This uses the decisions made by `categorize.py`, once I've manually inspected them, to do the following depending on which arguments are given:
@@ -212,6 +214,8 @@ This uses the decisions made by `categorize.py`, once I've manually inspected th
 
 To download files and delete them from the server, run for example `download.py -k` followed by `download.py -Dk`, or run `download.py -Mk`.
  `downtape.py` does this, with a `writetape` in the middle.
+ 
+Files are downloaded to the current working directory, or to a directory specified by `-o`.
 
 The server is found from the `Server` column in the csv file. Pass `--server-map`, which should 
 map server names to rclone server names (one-to-many):
@@ -254,13 +258,11 @@ The output filename is decided by the additional metadata fields in the csv. It 
 * `{Group}/{Date} - Episode {Episode} - Part {Part}`
 * `{Group}/{Date} - Episode {Episode} - {Output Title} - Part {Part}`
 
-The mappings from original filenames to renamed filenames (many-to-one, in case of `-m`) in a log file specified by `-o`.
+The mappings from original filenames to renamed filenames (many-to-one, in case of `-m`) in a log file specified by `--map-output`.
+
+General logging output can be teed to a file with `--log-output`.
 
 (This way the metadata left behind can be matched to the stored video files later.)
-
-### downloader.py
-
-Downloader model, used by `download.py` and `downtape.py`
 
 ### downtape.py
 
@@ -290,6 +292,14 @@ If `--copy-dead-to` is specified, files with alive=False (or a non-None falsy va
 before writing to tape. The destination specified is passed to rclone so should be in rclone format.
 
 Note: Budget 200 KB extra per video on the tape, for thumbnails + info.json + overhead + shenanigans
+
+### downloader.py
+
+Downloader model, used by `download.py` and `downtape.py`
+
+### view.py
+
+curses view used by `download.py` and `downtape.py`
 
 ## Credits & license
 
