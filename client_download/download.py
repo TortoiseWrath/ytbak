@@ -56,15 +56,19 @@ async def download(args, hub):
 	if args.delete:
 		tasks.append(downloader.download(filter_videos(all_videos, 'delete'),
 		                                 download=False, delete=True, keys=['delete']))
-	# if args.keep:
-	# 	downloader.download(filter_videos(all_videos, 'keep'), **job_options, job_name='keep')
-	# if args.archive:
-	# 	downloader.download(filter_videos(all_videos, 'archive'), **job_options, job_name='archive')
-	# if args.inspect:
-	# 	downloader.download(filter_videos(all_videos, 'inspect'), **job_options,
-	# 	                    add_attachments=False, rename=False, job_name='inspect')
-	# if args.merge:
-	# 	downloader.download_and_merge(all_videos, **job_options, job_name='merge')
+	if args.keep:
+		tasks.append(downloader.download_and_merge(
+			filter_videos(all_videos, 'keep'), **job_options, keys=['keep']))
+	if args.archive:
+		tasks.append(downloader.download_and_merge(
+			filter_videos(all_videos, 'archive'), **job_options,
+			add_attachments=False, rename=False, keys=['archive']))
+	if args.inspect:
+		tasks.append(downloader.download_and_merge(
+			filter_videos(all_videos, 'inspect'), **job_options,
+			add_attachments=False, rename=False, keys=['inspect']))
+	if args.merge:
+		tasks.append(downloader.download_and_merge(all_videos, **job_options, keys=['merge']))
 
 	await asyncio.gather(*tasks)
 
@@ -82,13 +86,14 @@ def main():
 	                    help='Delete files that would otherwise be downloaded')
 	parser.add_argument('-M', '--move', action='store_true', help='Delete files after downloading')
 	parser.add_argument('-k', '--keep', action='store_true',
-	                    help='Download files with the results "keep", "keep_*"')
+	                    help='Download and rename files with the results "keep", "keep_*"')
 	parser.add_argument('-a', '--archive', action='store_true',
 	                    help='Download files with the result "archive", "archive_*"')
 	parser.add_argument('-i', '--inspect', action='store_true',
 	                    help='Download files with the result "inspect"')
 	parser.add_argument('-m', '--merge', action='store_true',
-	                    help='Download and merge files with the results "audio", "video+subs", etc.')
+	                    help='Download, merge, and rename files with the results "audio", '
+	                         '"video+subs", etc.')
 	parser.add_argument('-t', '--tab-separated', action='store_true',
 	                    help='Interpret input file as UTF-16 TSV rather than UTF-8 CSV')
 	parser.add_argument('--map-output', nargs='?', type=argparse.FileType('a'), default=os.devnull,
@@ -102,8 +107,8 @@ def main():
 
 	args = parser.parse_args()
 	hub = aiopubsub.Hub()
+
 	ui = view.DownloadView(logfile=args.log_output, hub=hub)
-	# TODO: Detect pipe and run without curses
 	try:
 		asyncio.run(download(args, hub))
 	finally:

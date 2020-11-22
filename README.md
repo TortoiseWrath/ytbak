@@ -197,7 +197,8 @@ Dependencies: `bash`, `python` 3.7+, [`pipenv`](https://pypi.org/project/pipenv/
 [`youtube-dl`](https://github.com/ytdl-org/youtube-dl), 
 [MKVToolNix](https://mkvtoolnix.download/downloads.html)
 
-Set up venv with `pipenv install`
+Set up venv with `pipenv install`, then run with `pipenv shell` (on FreeBSD I had to use `LC_ALL=C.UTF-8 LANG=C.UTF-8 pipenv shell`)
+and `python downloader.py` or `python downtape.py`.
 
 ### download.py
 

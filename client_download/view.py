@@ -10,7 +10,7 @@ from downloader import Downloader
 
 
 # From https://github.com/chrisfleming/python-scrolling-pad/blob/master/infinite_pad.py
-class InfinitePad():
+class InfinitePad:
 	def __init__(self, screen, height, width, y_start, x_start):
 		self.screen = screen
 		self.height = height
@@ -25,6 +25,7 @@ class InfinitePad():
 
 	def write(self, message):
 		for line in message.split('\n'):
+			line = line.ljust(self.width, ' ')
 			if self.pad_pos < self.height:
 				self.pad.addnstr(self.pad_pos, 0, line, self.width)
 			else:
@@ -61,7 +62,10 @@ class DownloadView:
 		self.stdscr = curses.initscr()
 		curses.noecho()
 		curses.cbreak()
-		curses.curs_set(False)
+		try:
+			curses.curs_set(False)
+		except curses.error:
+			pass
 		self.stdscr.keypad(True)
 
 		self.log_pad = None
@@ -93,7 +97,9 @@ class DownloadView:
 				message.total_items or message.total_bytes):
 			self.jobs[key] = self.Job(key, self.hub, message.total_items, message.total_bytes, self)
 		elif isinstance(message, Downloader.CompletedMessage):
-			self.jobs.pop(key, None)
+			job = self.jobs.pop(key, None)
+			if job:
+				self.log(key, f"Completed: {job}")
 		self.refresh_progress_window()
 
 	def log(self, key, message):
@@ -137,9 +143,6 @@ class DownloadView:
 			self.subscriber = aiopubsub.Subscriber(hub, '.'.join(key))
 			self.subscriber.add_sync_listener(aiopubsub.Key(*key, '*'), self.update_progress)
 			self.view = view
-
-		# def __del__(self):
-		# 	await self.subscriber.remove_all_listeners()
 
 		def __str__(self):
 			percent = floor((self.processed_bytes / self.total_bytes if self.total_bytes

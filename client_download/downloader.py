@@ -9,6 +9,39 @@ from humanize import naturalsize
 IMAGE_FILES = ['jpg', 'webp', 'png', 'jpeg', 'gif']
 
 
+def _create_filter_files(videos, include_videos=True, include_thumbnails=True,
+                         include_metadata=False):
+	"""
+	Create filter files to select files from rsync.
+	:param include_metadata: Whether to include json files as well as video files
+	:param include_thumbnails: Whether to include thumbnail files as well as video files
+	:param videos: Videos to download
+	:return: dictionary mapping server name to path to relevant file
+	"""
+	filter_map = {}  # server -> list of filters
+	add_extensions = IMAGE_FILES.copy() if include_thumbnails else []
+	if include_metadata:
+		add_extensions.append('*.json')
+
+	for v in videos:
+		extensions = add_extensions.copy()
+		if include_videos:
+			extensions.append(ext(v['Filename']))
+		if v['Server'] not in filter_map:
+			filter_map[v['Server']] = []
+		filter_map[v['Server']].append(
+			f"/{re.escape(remove_ext(v['Filename']))}.{{{','.join(map(re.escape, extensions))}}}\n")
+
+	filter_files = {}  # server -> filename
+	for server, filters in filter_map.items():
+		filename = 'temp/' + str(uuid.uuid4())
+		filter_files[server] = filename
+		with open(filename, 'w') as file:
+			file.writelines(filters)
+
+	return filter_files
+
+
 class Downloader:
 	def __init__(self, server_map_file, hub, prefix, output_dir='.', output_file=None,
 	             dry_run=False):
@@ -42,39 +75,6 @@ class Downloader:
 				server_map[row[0]] = []
 			server_map[row[0]].append(row[1])
 		self.server_map = server_map
-
-	def __create_filter_files(self, videos, include_videos=True, include_thumbnails=True,
-	                          include_metadata=False):
-		"""
-		Create filter files to select files from rsync.
-		:param include_metadata: Whether to include json files as well as video files
-		:param include_thumbnails: Whether to include thumbnail files as well as video files
-		:param videos: Videos to download
-		:return: dictionary mapping server name to path to relevant file
-		"""
-		filter_map = {}  # server -> list of filters
-		add_extensions = IMAGE_FILES.copy() if include_thumbnails else []
-		if include_metadata:
-			add_extensions.append('*.json')
-
-		for v in videos:
-			extensions = add_extensions.copy()
-			if include_videos:
-				extensions.append(ext(v['Filename']))
-			if v['Server'] not in filter_map:
-				filter_map[v['Server']] = []
-			filter_map[v['Server']].append(
-				f"/{re.escape(remove_ext(v['Filename']))}.{{{','.join(map(re.escape, extensions))}}}")
-
-		filter_files = {}  # server -> filename
-		for server, filters in filter_map.items():
-			filename = 'temp/' + str(uuid.uuid4())
-			filter_files[server] = filename
-			filters.append('\n')  # write newline at end of file
-			with open(filename, 'w') as file:
-				file.writelines(filters)
-
-		return filter_files
 
 	def __pub(self, message, keys):
 		self.publisher.publish(aiopubsub.Key(*keys), message)
@@ -162,7 +162,7 @@ class Downloader:
 		tasks = []
 		if download:
 			rclone_action = 'move' if delete else 'copy'
-			filter_files = self.__create_filter_files(videos, include_metadata=not delete)
+			filter_files = _create_filter_files(videos, include_metadata=not delete)
 			for server, filter_file in filter_files.items():
 				for rclone_server in self.server_map[server]:
 					tasks.append(
@@ -170,7 +170,7 @@ class Downloader:
 						                video_sizes=size_map, keys=(*keys, f't{len(tasks)}')))
 			if delete:
 				# Get just metadata files, which should not be deleted
-				metadata_filter_files = self.__create_filter_files(
+				metadata_filter_files = _create_filter_files(
 					videos, include_videos=False, include_thumbnails=False, include_metadata=True)
 				for server, filter_file in metadata_filter_files.items():
 					for rclone_server in self.server_map[server]:
@@ -178,7 +178,7 @@ class Downloader:
 							self.run_rclone(rclone_server, self.output_dir, 'copy', filter_file,
 							                video_sizes=size_map, keys=(*keys, f't{len(tasks)}')))
 		elif delete:
-			filter_files = self.__create_filter_files(videos, include_metadata=False)
+			filter_files = _create_filter_files(videos, include_metadata=False)
 			for server, filter_file in filter_files.items():
 				for rclone_server in self.server_map[server]:
 					tasks.append(
