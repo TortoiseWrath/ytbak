@@ -195,7 +195,7 @@ Once I've figured out what to do with the videos with the help of the client pro
 
 Dependencies: `bash`, `python` 3.7+, [`pipenv`](https://pypi.org/project/pipenv/), `rclone`, `ffmpeg`, 
 [`youtube-dl`](https://github.com/ytdl-org/youtube-dl), 
-[MKVToolNix](https://mkvtoolnix.download/downloads.html)
+[MKVToolNix](https://mkvtoolnix.download/downloads.html), imagemagick
 
 Set up venv with `pipenv install`, then run with `pipenv shell` (on FreeBSD I had to use `LC_ALL=C.UTF-8 LANG=C.UTF-8 pipenv shell`)
 and `python downloader.py` or `python downtape.py`.
@@ -272,14 +272,14 @@ Note when writing this: https://unix.stackexchange.com/questions/346853/tar-list
 Once I have results from `categorize.py`, I manually split the ones I _don't_ want to keep on my server into volumes with
 the size of archival tapes, and use this to semi-automate the archival process.
 
-Takes as an argument directory full of input CSV files, which are handled in order by filename.
+Takes as an argument a directory full of input CSV files, which are handled in order by filename.
 
-Runs `download.py -k` on each one to download the files with the result `keep` into the directory 1/,
+Runs the equivalent of `download.py -k` on the first one to download the files with the result `keep` into the directory 1/,
 then runs `writetape` to write the downloaded files to tape and delete the local files.
 
 While that tape is being written, it runs `download.py -k` on the next input file and saves them to 2/, etc.
 
-Can put files in 1/, 2/, etc. before running this, to include things like the results of `download.py -m`. 
+You can put other files in 1/, 2/, etc. before running this, to include things like the results of `download.py -m`. 
 
 After writing a tape, it ejects the tape, deletes the files from the server with `download.py -Dk`, and waits until the next tape is inserted to start writing another one.
 
@@ -301,6 +301,34 @@ Downloader model, used by `download.py` and `downtape.py`
 ### view.py
 
 curses view used by `download.py` and `downtape.py`
+
+### merge.py
+
+Used by `downloader.py` to merge files (a/v streams and attachments) into MKV files.
+
+Can also be run as a separate script, with these arguments:
+
+* `-a audio-source`
+* `-v video-source`
+* `-s subtitle-source`
+* `-o output-file-name`
+* `-d` to delete source files
+
+or just a file as an argument to use it as both an audio and a video source.
+
+If the "output file name" is an existing directory, it will output to that directory with the same base filename as the first   
+input file. If omitted, it defaults to the directory where the first input file was. If it's a file that doesn't exist, it will 
+create that file, adding the extension ".mkv" if it's not present in the argument. If it's a file that exists, it will
+throw an error.
+
+`merge.py` looks for other files with the same name as the given a/v files but with a different file extension and 
+includes these as attachments.
+
+If there's nothing to merge into an existing mkv file, it doesn't do any merging and just moves it to the directory
+specified by -o. 
+
+To merge all files in a directory with their attachments, do something like
+`find /videos -type f -name "*.mp4" -exec python3 merge.py -o /videos {} \;`.
 
 ## Credits & license
 

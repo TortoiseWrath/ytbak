@@ -197,6 +197,8 @@ class Downloader:
 		:param merge: Whether to merge downloaded video files according to the "result" column
 		:param rename: Whether to rename files to new_filename(video)
 		"""
+		if not (add_attachments or merge or rename):
+			return
 		path_map = filename_map(videos, rename=rename)
 		raise NotImplementedError("No merging!")
 
@@ -212,7 +214,8 @@ class Downloader:
 		:param merge: Whether to merge downloaded video files according to the "result" column
 		:param rename: Whether to rename files to new_filename(video)
 		"""
-		raise NotImplementedError("No downloading and especially no merging.")
+		await self.download(videos, keys, download, delete)
+		await self.merge_and_rename(videos, keys, add_attachments, merge, rename)
 
 	class NewTaskMessage:
 		def __init__(self, command=None, total_items=None, total_bytes=None):

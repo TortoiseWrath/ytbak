@@ -60,13 +60,11 @@ async def download(args, hub):
 		tasks.append(downloader.download_and_merge(
 			filter_videos(all_videos, 'keep'), **job_options, keys=['keep']))
 	if args.archive:
-		tasks.append(downloader.download_and_merge(
-			filter_videos(all_videos, 'archive'), **job_options,
-			add_attachments=False, rename=False, keys=['archive']))
+		tasks.append(downloader.download(filter_videos(all_videos, 'archive'), **job_options,
+		                                 keys=['inspect']))
 	if args.inspect:
-		tasks.append(downloader.download_and_merge(
-			filter_videos(all_videos, 'inspect'), **job_options,
-			add_attachments=False, rename=False, keys=['inspect']))
+		tasks.append(downloader.download(filter_videos(all_videos, 'inspect'), **job_options,
+		                                 keys=['inspect']))
 	if args.merge:
 		tasks.append(downloader.download_and_merge(all_videos, **job_options, keys=['merge']))
 
@@ -86,7 +84,7 @@ def main():
 	                    help='Delete files that would otherwise be downloaded')
 	parser.add_argument('-M', '--move', action='store_true', help='Delete files after downloading')
 	parser.add_argument('-k', '--keep', action='store_true',
-	                    help='Download and rename files with the results "keep", "keep_*"')
+	                    help='Download, merge, and rename files with the results "keep", "keep_*"')
 	parser.add_argument('-a', '--archive', action='store_true',
 	                    help='Download files with the result "archive", "archive_*"')
 	parser.add_argument('-i', '--inspect', action='store_true',
