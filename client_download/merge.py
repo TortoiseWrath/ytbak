@@ -43,7 +43,10 @@ def merge(source_files, audio_files, video_files, subtitle_files, output_filenam
 	video_files = video_files or []
 	subtitle_files = subtitle_files or []
 
-	args = ['mkvmerge', '--no-date', '-o', output_filename]
+	output = 'temp.mkv' if output_filename in (source_files + audio_files + video_files +
+	                                           subtitle_files) else output_filename
+
+	args = ['mkvmerge', '--no-date', '-o', output]
 
 	if title:
 		args += ['--title', title]
@@ -67,12 +70,6 @@ def merge(source_files, audio_files, video_files, subtitle_files, output_filenam
 	if created_cover:
 		files_to_delete.add('cover.jpg')
 
-	if dry_run:
-		print(f"Dry run; would execute:\n{' '.join(map(shlex.quote, args))}")
-		if len(files_to_delete) > 0:
-			print(f"Dry run; would execute:\nrm {' '.join(map(shlex.quote, files_to_delete))}")
-		return
-
 	print(' '.join(map(shlex.quote, args)))
 	if not dry_run:
 		result = subprocess.run(args)
@@ -81,9 +78,17 @@ def merge(source_files, audio_files, video_files, subtitle_files, output_filenam
 
 	if len(files_to_delete) > 0:
 		print('rm ' + ' '.join(map(shlex.quote, files_to_delete)))
-		result = subprocess.run(['rm', *files_to_delete])
-		if result.returncode != 0:
-			raise RuntimeError("Got non-zero exit code from rm")
+		if not dry_run:
+			result = subprocess.run(['rm', *files_to_delete])
+			if result.returncode != 0:
+				raise RuntimeError("Got non-zero exit code from rm")
+
+	if output != output_filename:
+		print(f"mv {shlex.quote(output)} {shlex.quote(output_filename)}")
+		if not dry_run:
+			result = subprocess.run(['mv', output, output_filename])
+			if result.returncode != 0:
+				raise RuntimeError("Got non-zero exit code from mv")
 
 
 def main():
@@ -112,13 +117,13 @@ def main():
 	if len(all_sources) == 0:
 		raise ValueError('No video files')
 
-	output_dir = os.path.basename(all_sources[0])
+	output_dir = os.path.dirname(all_sources[0])
 	proposed_output_file = all_sources[0] if ext(all_sources[0]) == 'mkv' \
 		else remove_ext(all_sources[0]) + '.mkv'
 	output_file = output_dir if args.output else proposed_output_file
 	if os.path.isdir(output_file):
 		output_file = os.path.join(args.output, os.path.basename(proposed_output_file))
-	if os.path.isfile(output_file):
+	if os.path.isfile(output_file) and output_file not in all_sources:
 		raise ValueError(f'File {output_file} already exists')
 
 	merge(source_files or [], audio_files or [], video_files or [], sub_files or [], output_file,

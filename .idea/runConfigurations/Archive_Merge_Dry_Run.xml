@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Archive+Inspect Dry Run" type="PythonConfigurationType" factoryName="Python" folderName="download">
+  <configuration default="false" name="Archive+Merge Dry Run" type="PythonConfigurationType" factoryName="Python" folderName="download">
     <module name="client_download" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
@@ -20,7 +20,7 @@
       </option>
     </PathMappingSettings>
     <option name="SCRIPT_NAME" value="download" />
-    <option name="PARAMETERS" value="-nait /backup/temp/test_file.txt --server-map /backup/temp/server_map.csv --map-output /backup/temp/filemap.csv --log-output /backup/temp/dry_run_log -o /backup/temp/rtbak" />
+    <option name="PARAMETERS" value="-namt /backup/temp/test_file.txt --server-map /backup/temp/server_map.csv --map-output /backup/temp/filemap.csv --log-output /backup/temp/dry_run_log -o /backup/temp/rtbak" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="true" />

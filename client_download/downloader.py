@@ -21,7 +21,7 @@ def _create_filter_files(videos, include_videos=True, include_thumbnails=True,
 	filter_map = {}  # server -> list of filters
 	add_extensions = IMAGE_FILES.copy() if include_thumbnails else []
 	if include_metadata:
-		add_extensions.append('*.json')
+		add_extensions.append('json')
 
 	for v in videos:
 		extensions = add_extensions.copy()
