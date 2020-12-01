@@ -58,8 +58,7 @@ async def download(args, hub):
 		                                 download=False, delete=True, keys=['delete']))
 	if args.keep:
 		tasks.append(downloader.download_and_merge(
-			filter_videos(all_videos, 'keep'), **job_options, keys=['keep'],
-			merge=False, rename=True))
+			filter_videos(all_videos, 'keep'), **job_options, keys=['keep']))
 	if args.archive:
 		tasks.append(downloader.download(filter_videos(all_videos, 'archive'), **job_options,
 		                                 keys=['inspect']))

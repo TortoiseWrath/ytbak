@@ -1,4 +1,3 @@
-import shlex
 import unicodedata
 
 import aiopubsub
@@ -198,34 +197,31 @@ class Downloader:
 		await asyncio.gather(*tasks)
 		self.__pub(self.CompletedMessage(), keys)
 
-	async def merge_and_rename(self, videos, keys, merge=True, rename=True):
+	async def merge_and_rename(self, videos, keys):
 		"""
 		Merge and rename downloaded videos according to the rules suggested by videos
 		:param videos: list of videos
 		:param keys: message keys
-		:param add_attachments: Whether to add attachments to the downloaded file
-		:param merge: Whether to merge downloaded video files according to the "result" column
-		:param rename: Whether to rename files to new_filename(video)
 		"""
-		if not (merge or rename):
-			return
-
-		if merge and not rename:
-			raise ValueError("Cannot merge but not rename")
-
-		if rename and not merge:
-			self.__pub(self.NewTaskMessage(total_items=len(videos)), keys)
-			for video in videos:
-				destination = new_filename(video) + '.' + ext(video['Filename'])
-				self.__pub(f"mv {shlex.quote(video['Filename'])} {shlex.quote(destination)}", keys)
-				if not self.dry_run:
-					result = subprocess.run(['mv', video['Filename'], destination])
-					if result.returncode != 0:
-						raise RuntimeError("Got non-zero exit code from mv")
-				self.output_file.writerow([video['Filename'], destination])
-				self.__pub(self.ProgressMessage(video['Filename'], processed_items=1), keys)
-			self.__pub(self.CompletedMessage(), keys)
-			return
+		# if not (merge or rename):
+		# 	return
+		#
+		# if merge and not rename:
+		# 	raise ValueError("Cannot merge but not rename")
+		#
+		# if rename and not merge:
+		# 	self.__pub(self.NewTaskMessage(total_items=len(videos)), keys)
+		# 	for video in videos:
+		# 		destination = new_filename(video) + '.' + ext(video['Filename'])
+		# 		self.__pub(f"mv {shlex.quote(video['Filename'])} {shlex.quote(destination)}", keys)
+		# 		if not self.dry_run:
+		# 			result = subprocess.run(['mv', video['Filename'], destination])
+		# 			if result.returncode != 0:
+		# 				raise RuntimeError("Got non-zero exit code from mv")
+		# 		self.output_file.writerow([video['Filename'], destination])
+		# 		self.__pub(self.ProgressMessage(video['Filename'], processed_items=1), keys)
+		# 	self.__pub(self.CompletedMessage(), keys)
+		# 	return
 
 		destinations = {}
 		for video in videos:
@@ -267,8 +263,7 @@ class Downloader:
 
 		self.__pub(self.CompletedMessage(), keys)
 
-	async def download_and_merge(self, videos, keys, download=True, delete=False,
-	                             merge=True, rename=True):
+	async def download_and_merge(self, videos, keys, download=True, delete=False):
 		"""
 		Download videos, then merge and rename
 		:param videos: A list of video dictionaries
@@ -282,7 +277,7 @@ class Downloader:
 
 		await self.download(videos, [*keys, 'download'], download, delete)
 		if download:
-			await self.merge_and_rename(videos, [*keys, 'merge'], merge, rename)
+			await self.merge_and_rename(videos, [*keys, 'merge'])
 
 	class NewTaskMessage:
 		def __init__(self, command=None, total_items=None, total_bytes=None):
@@ -375,7 +370,7 @@ def new_filename(video):
 		output_filename += sanitize(video['Output Title'])
 	else:
 		if video['Series']:
-			output_filename += sanitize(video['Series']) + '/'
+			output_filename += video['Series'] + '/'
 
 		date = video['Date'].strip()
 		if not re.match(r'^\d{8}$', date):
