@@ -207,7 +207,7 @@ def process_vidinfo(input_vidinfo, alivelist):
 		# Compare video resolution
 		if int(youtube_video['Height']) < int(roosterteeth_video['Height']):
 			youtube_preferred = False
-		elif int(roosterteeth_video['Height']) > int(roosterteeth_video['Height']):
+		elif int(roosterteeth_video['Height']) > int(youtube_video['Height']):
 			youtube_preferred = True
 		else:
 			# Compare video quality
