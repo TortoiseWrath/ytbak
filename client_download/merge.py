@@ -1,6 +1,7 @@
 import glob
 import shlex
 
+import aiopubsub
 import argparse
 import os
 import subprocess
@@ -13,15 +14,18 @@ def find_attachments(*filenames):
 	        and ext(attachment) != 'mkv'}
 
 
-def merge(source_files, audio_files, video_files, subtitle_files, output_filename,
-          delete_source=False, delete_json=False, dry_run=False, title=None):
+def merge(source_files, audio_files, video_files, subtitle_files, output_filename, pub,
+          delete_source=False, delete_json=False, dry_run=False, title=None, keys=None):
+	if not keys:
+		keys = ['merge']
+
 	attachments = find_attachments(*source_files, *audio_files, *video_files, *subtitle_files)
 
 	created_cover = False
 	cover = next((a for a in attachments if ext(a) in ('jpg', 'jpeg')), None)
 	cover_source = cover
 	if not cover:
-		cover = next((a for a in attachments if ext(a) in ('png', 'webp', 'jfif', 'gif')), None)
+		cover = next((a for a in attachments if ext(a) in IMAGE_FILES), None)
 		if cover:
 			if os.path.isfile('cover.jpg'):
 				raise RuntimeError("cover.jpg already exists in current directory")
@@ -57,7 +61,7 @@ def merge(source_files, audio_files, video_files, subtitle_files, output_filenam
 	args += source_files
 	args += [arg for file in audio_files for arg in ('-D', file)]
 	args += [arg for file in video_files for arg in ('-A', file)]
-	args += [arg for file in subtitle_files for arg in ('-AD', file)]
+	args += [arg for file in subtitle_files for arg in ('-A', '-D', file)]
 
 	files_to_delete = set()
 	if delete_source:
@@ -68,21 +72,22 @@ def merge(source_files, audio_files, video_files, subtitle_files, output_filenam
 	if created_cover:
 		files_to_delete.add('cover.jpg')
 
-	print(' '.join(map(shlex.quote, args)))
+	pub.publish(aiopubsub.Key(*keys), ' '.join(map(shlex.quote, args)))
 	if not dry_run:
 		result = subprocess.run(args)
 		if result.returncode != 0:
 			raise RuntimeError("Got non-zero exit code from mkvmerge")
 
 	if len(files_to_delete) > 0:
-		print('rm ' + ' '.join(map(shlex.quote, files_to_delete)))
+		pub.publish(aiopubsub.Key(*keys), 'rm ' + ' '.join(map(shlex.quote, files_to_delete)))
 		if not dry_run:
 			result = subprocess.run(['rm', *files_to_delete])
 			if result.returncode != 0:
 				raise RuntimeError("Got non-zero exit code from rm")
 
 	if output != output_filename:
-		print(f"mv {shlex.quote(output)} {shlex.quote(output_filename)}")
+		pub.publish(aiopubsub.Key(*keys),
+		            f"mv {shlex.quote(output)} {shlex.quote(output_filename)}")
 		if not dry_run:
 			result = subprocess.run(['mv', output, output_filename])
 			if result.returncode != 0:
@@ -105,6 +110,11 @@ def main():
 
 	args = parser.parse_args()
 
+	hub = aiopubsub.Hub()
+	pub = aiopubsub.Publisher(hub, aiopubsub.Key('main'))
+	sub = aiopubsub.Subscriber(hub, 'main')
+	sub.add_sync_listener(aiopubsub.Key('*'), lambda k, m: print(m))
+
 	source_files = args.source or []
 	video_files = args.video or []
 	audio_files = args.audio or []
@@ -126,7 +136,7 @@ def main():
 
 	merge(source_files or [], audio_files or [], video_files or [], sub_files or [], output_file,
 	      delete_source=args.delete_source_files, dry_run=args.dry_run,
-	      delete_json=args.delete_source_json, title=args.title)
+	      delete_json=args.delete_source_json, title=args.title, pub=pub)
 
 
 if __name__ == "__main__":
@@ -149,3 +159,6 @@ def ext(path):
 		second = os.path.splitext(first[0])
 		return second[1][1:] + first[1] if 3 <= len(second[1]) <= 8 else first[1][1:]
 	return first[1][1:]
+
+
+IMAGE_FILES = ['jpg', 'webp', 'png', 'jpeg', 'gif', 'jfif']

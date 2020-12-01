@@ -1,0 +1,31 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Merge" type="PythonConfigurationType" factoryName="Python" folderName="download">
+    <module name="client_download" />
+    <option name="INTERPRETER_OPTIONS" value="" />
+    <option name="PARENT_ENVS" value="true" />
+    <envs>
+      <env name="PYTHONUNBUFFERED" value="1" />
+    </envs>
+    <option name="SDK_HOME" value="sftp://tortoise@10.0.0.10:22/home/tortoise/.local/share/virtualenvs/client_download-XEjgGt6L/bin/python" />
+    <option name="WORKING_DIRECTORY" value="$USER_HOME$/client_download" />
+    <option name="IS_MODULE_SDK" value="true" />
+    <option name="ADD_CONTENT_ROOTS" value="true" />
+    <option name="ADD_SOURCE_ROOTS" value="true" />
+    <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+    <PathMappingSettings>
+      <option name="pathMappings">
+        <list>
+          <mapping local-root="$PROJECT_DIR$/client_download" remote-root="/usr/home/tortoise/client_download" />
+        </list>
+      </option>
+    </PathMappingSettings>
+    <option name="SCRIPT_NAME" value="download" />
+    <option name="PARAMETERS" value="-mt /backup/temp/test_file.txt --server-map /backup/temp/server_map.csv --map-output /backup/temp/filemap.csv --log-output /backup/temp/merge_log -o /backup/temp/merge_test" />
+    <option name="SHOW_COMMAND_LINE" value="false" />
+    <option name="EMULATE_TERMINAL" value="false" />
+    <option name="MODULE_MODE" value="true" />
+    <option name="REDIRECT_INPUT" value="false" />
+    <option name="INPUT_FILE" value="" />
+    <method v="2" />
+  </configuration>
+</component>

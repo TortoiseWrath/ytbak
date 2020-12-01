@@ -1,3 +1,6 @@
+import shlex
+import unicodedata
+
 import aiopubsub
 import asyncio
 import csv
@@ -7,9 +10,7 @@ import subprocess
 import uuid
 from humanize import naturalsize
 
-from merge import merge as merge_videos, remove_ext, ext
-
-IMAGE_FILES = ['jpg', 'webp', 'png', 'jpeg', 'gif']
+from merge import merge as merge_videos, remove_ext, ext, IMAGE_FILES
 
 
 def _create_filter_files(videos, include_videos=True, include_thumbnails=True,
@@ -121,7 +122,8 @@ class Downloader:
 				if log_level and (event.endswith('--dry-run')
 				                  or event.endswith('skipping')  # Already downloaded; add to totals
 				                  or (event == 'Deleted' and action == 'delete')
-				                  or event.startswith('Copied')):
+				                  or event.startswith('Copied')
+				                  or event.startswith('Multi-thread Copied')):
 					# Something significant happened
 					extension = ext(file)
 					if extension not in IMAGE_FILES and not extension.endswith('json'):
@@ -191,7 +193,7 @@ class Downloader:
 		await asyncio.gather(*tasks)
 		self.__pub(self.CompletedMessage(), keys)
 
-	async def merge_and_rename(self, videos, keys, add_attachments=True, merge=True, rename=True):
+	async def merge_and_rename(self, videos, keys, merge=True, rename=True):
 		"""
 		Merge and rename downloaded videos according to the rules suggested by videos
 		:param videos: list of videos
@@ -200,7 +202,7 @@ class Downloader:
 		:param merge: Whether to merge downloaded video files according to the "result" column
 		:param rename: Whether to rename files to new_filename(video)
 		"""
-		if not (add_attachments or merge or rename):
+		if not (merge or rename):
 			return
 
 		if merge and not rename:
@@ -210,10 +212,11 @@ class Downloader:
 			self.__pub(self.NewTaskMessage(total_items=len(videos)), keys)
 			for video in videos:
 				destination = new_filename(video) + '.' + ext(video['Filename'])
-
-				result = subprocess.run(['mv', video['Filename'], destination])
-				if result.returncode != 0:
-					raise RuntimeError("Got non-zero exit code from mv")
+				self.__pub(f"mv {shlex.quote(video['Filename'])} {shlex.quote(destination)}", keys)
+				if not self.dry_run:
+					result = subprocess.run(['mv', video['Filename'], destination])
+					if result.returncode != 0:
+						raise RuntimeError("Got non-zero exit code from mv")
 				self.output_file.writerow([video['Filename'], destination])
 				self.__pub(self.ProgressMessage(video['Filename'], processed_items=1), keys)
 			self.__pub(self.CompletedMessage(), keys)
@@ -230,26 +233,30 @@ class Downloader:
 
 		for target, sources in destinations.items():
 			if len(sources):
-				await merge_videos(
-					source_files=[x for x in sources if x['result'].startswith('keep')
-					              or x['result'] == 'audio+video'],
-					audio_files=[x for x in sources if x['result'] in ['audio', 'audio+subs']],
-					video_files=[x for x in sources if x['result'] in ['video', 'video+subs']],
-					subtitle_files=[x for x in sources if
+				merge_videos(
+					source_files=[self.output_dir + '/' + x['Filename'] for x in sources if
+					              x['result'].startswith('keep') or x['result'] == 'audio+video'],
+					audio_files=[self.output_dir + '/' + x['Filename'] for x in sources if
+					             x['result'] in ['audio', 'audio+subs']],
+					video_files=[self.output_dir + '/' + x['Filename'] for x in sources if
+					             x['result'] in ['video', 'video+subs']],
+					subtitle_files=[self.output_dir + '/' + x['Filename'] for x in sources if
 					                x['result'] in ['subs', 'audio+subs', 'video+subs']],
-					output_filename=target + '.mkv',
+					output_filename=self.output_dir + '/' + target + '.mkv',
 					delete_source=True,
 					delete_json=False,
 					dry_run=self.dry_run,
-					title=sources[0]['Output Title']
+					title=sources[0]['Output Title'],
+					pub=self.publisher, keys=[*keys, 'merge']
 				)
 				self.output_file.writerows([[x['Filename'], target + '.mkv'] for x in sources])
-			self.__pub(self.ProgressMessage(target, processed_items=1), keys)
+			self.__pub(self.ProgressMessage("Merged: " + target, processed_items=1),
+			           [*keys, 'merge'])
 
 		self.__pub(self.CompletedMessage(), keys)
 
 	async def download_and_merge(self, videos, keys, download=True, delete=False,
-	                             add_attachments=True, merge=True, rename=True):
+	                             merge=True, rename=True):
 		"""
 		Download videos, then merge and rename
 		:param videos: A list of video dictionaries
@@ -262,7 +269,8 @@ class Downloader:
 		"""
 
 		await self.download(videos, [*keys, 'download'], download, delete)
-		await self.merge_and_rename(videos, [*keys, 'merge'], add_attachments, merge, rename)
+		if download:
+			await self.merge_and_rename(videos, [*keys, 'merge'], merge, rename)
 
 	class NewTaskMessage:
 		def __init__(self, command=None, total_items=None, total_bytes=None):
@@ -352,37 +360,27 @@ def new_filename(video):
 
 	output_filename = video['Group'] + '/'
 	if se_format:
-		output_filename += video['Output Title']
+		output_filename += sanitize(video['Output Title'])
 	else:
 		if video['Series']:
-			output_filename += video['Series'] + '/'
+			output_filename += sanitize(video['Series']) + '/'
 
 		date = video['Date'].strip()
+		if not re.match(r'^\d{8}$', date):
+			return remove_ext(video['Filename'])
 		output_filename += f"{date[0:4]}-{date[4:6]}-{date[6:8]}"
 
 		if video['Episode']:
-			output_filename += f" - Episode {video['Episode']}"
+			output_filename += f" - Episode {sanitize(video['Episode'])}"
 
 		if video['Output Title']:
-			output_filename += f" - {video['Output Title']}"
+			output_filename += f" - {sanitize(video['Output Title'])}"
 
 	if video['Part']:
-		output_filename += f" - Part {video['Part']}"
+		output_filename += f" - Part {sanitize(video['Part'])}"
 	return output_filename
 
 
-def filename_map(videos, rename=True):
-	"""
-	Create a filename mapping from new paths to old paths according to new_filename,
-	excluding file extensions.
-	:param videos: List of videos
-	:param rename: If false, this only deals with other_path.
-	:return: a dictionary
-	"""
-	path_map = {
-		remove_ext(v['Filename']): (new_filename(v) if rename else remove_ext(v['Filename']))
-		for v in videos}
-	path_map.update({
-		remove_ext(v['other_path']): path_map[remove_ext(v['Filename'])]
-		for v in videos})
-	return path_map
+def sanitize(input):
+	return ''.join(c if c not in r'<>:"/\|?*' and '\u0020' <= c <= '\uFFFF' else '_' for c in
+	               unicodedata.normalize('NFC', input)).strip()
