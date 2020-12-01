@@ -5,8 +5,6 @@ import argparse
 import os
 import subprocess
 
-from downloader import ext, remove_ext
-
 
 def find_attachments(*filenames):
 	return {attachment for attachments
@@ -133,3 +131,21 @@ def main():
 
 if __name__ == "__main__":
 	main()
+
+
+def remove_ext(path):
+	first = os.path.splitext(path)
+	# handle .info.json, .rechat.json, etc.
+	if first[1] == '.json':
+		second = os.path.splitext(first[0])
+		return second[0] if 3 <= len(second[1]) <= 8 else first[0]
+	return first[0]
+
+
+def ext(path):
+	first = os.path.splitext(path)
+	# handle .info.json, .rechat.json, etc.
+	if first[1] == '.json':
+		second = os.path.splitext(first[0])
+		return second[1][1:] + first[1] if 3 <= len(second[1]) <= 8 else first[1][1:]
+	return first[1][1:]

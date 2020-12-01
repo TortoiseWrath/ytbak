@@ -58,7 +58,8 @@ async def download(args, hub):
 		                                 download=False, delete=True, keys=['delete']))
 	if args.keep:
 		tasks.append(downloader.download_and_merge(
-			filter_videos(all_videos, 'keep'), **job_options, keys=['keep']))
+			filter_videos(all_videos, 'keep'), **job_options, keys=['keep'],
+			merge=False, rename=True))
 	if args.archive:
 		tasks.append(downloader.download(filter_videos(all_videos, 'archive'), **job_options,
 		                                 keys=['inspect']))
@@ -66,7 +67,9 @@ async def download(args, hub):
 		tasks.append(downloader.download(filter_videos(all_videos, 'inspect'), **job_options,
 		                                 keys=['inspect']))
 	if args.merge:
-		tasks.append(downloader.download_and_merge(all_videos, **job_options, keys=['merge']))
+		tasks.append(downloader.download_and_merge(
+			filter_videos(all_videos, 'subs', 'audio', 'audio+video', 'video', 'video+subs',
+			              'audio+subs'), **job_options, keys=['merge']))
 
 	await asyncio.gather(*tasks)
 

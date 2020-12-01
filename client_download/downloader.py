@@ -3,8 +3,11 @@ import asyncio
 import csv
 import os
 import re
+import subprocess
 import uuid
 from humanize import naturalsize
+
+from merge import merge as merge_videos, remove_ext, ext
 
 IMAGE_FILES = ['jpg', 'webp', 'png', 'jpeg', 'gif']
 
@@ -21,7 +24,7 @@ def _create_filter_files(videos, include_videos=True, include_thumbnails=True,
 	filter_map = {}  # server -> list of filters
 	add_extensions = IMAGE_FILES.copy() if include_thumbnails else []
 	if include_metadata:
-		add_extensions.append('json')
+		add_extensions.append('*.json')
 
 	for v in videos:
 		extensions = add_extensions.copy()
@@ -30,7 +33,7 @@ def _create_filter_files(videos, include_videos=True, include_thumbnails=True,
 		if v['Server'] not in filter_map:
 			filter_map[v['Server']] = []
 		filter_map[v['Server']].append(
-			f"/{re.escape(remove_ext(v['Filename']))}.{{{','.join(map(re.escape, extensions))}}}\n")
+			f"/{re.escape(remove_ext(v['Filename']))}.{{{','.join(extensions)}}}\n")
 
 	filter_files = {}  # server -> filename
 	for server, filters in filter_map.items():
@@ -55,7 +58,7 @@ class Downloader:
 		:param dry_run: Whether to do a dry run
 		"""
 		self.__read_server_map(server_map_file)
-		self.output_file = output_file
+		self.output_file = csv.writer(output_file)
 		self.dry_run = dry_run
 		self.output_dir = output_dir
 		self.publisher = aiopubsub.Publisher(hub, aiopubsub.Key(prefix))
@@ -199,8 +202,51 @@ class Downloader:
 		"""
 		if not (add_attachments or merge or rename):
 			return
-		path_map = filename_map(videos, rename=rename)
-		raise NotImplementedError("No merging!")
+
+		if merge and not rename:
+			raise ValueError("Cannot merge but not rename")
+
+		if rename and not merge:
+			self.__pub(self.NewTaskMessage(total_items=len(videos)), keys)
+			for video in videos:
+				destination = new_filename(video) + '.' + ext(video['Filename'])
+
+				result = subprocess.run(['mv', video['Filename'], destination])
+				if result.returncode != 0:
+					raise RuntimeError("Got non-zero exit code from mv")
+				self.output_file.writerow([video['Filename'], destination])
+				self.__pub(self.ProgressMessage(video['Filename'], processed_items=1), keys)
+			self.__pub(self.CompletedMessage(), keys)
+			return
+
+		destinations = {}
+		for video in videos:
+			target = new_filename(video)
+			if target not in destinations:
+				destinations[target] = []
+			destinations[target].append(video)
+
+		self.__pub(self.NewTaskMessage(total_items=len(destinations)), keys)
+
+		for target, sources in destinations.items():
+			if len(sources):
+				await merge_videos(
+					source_files=[x for x in sources if x['result'].startswith('keep')
+					              or x['result'] == 'audio+video'],
+					audio_files=[x for x in sources if x['result'] in ['audio', 'audio+subs']],
+					video_files=[x for x in sources if x['result'] in ['video', 'video+subs']],
+					subtitle_files=[x for x in sources if
+					                x['result'] in ['subs', 'audio+subs', 'video+subs']],
+					output_filename=target + '.mkv',
+					delete_source=True,
+					delete_json=False,
+					dry_run=self.dry_run,
+					title=sources[0]['Output Title']
+				)
+				self.output_file.writerows([[x['Filename'], target + '.mkv'] for x in sources])
+			self.__pub(self.ProgressMessage(target, processed_items=1), keys)
+
+		self.__pub(self.CompletedMessage(), keys)
 
 	async def download_and_merge(self, videos, keys, download=True, delete=False,
 	                             add_attachments=True, merge=True, rename=True):
@@ -214,8 +260,9 @@ class Downloader:
 		:param merge: Whether to merge downloaded video files according to the "result" column
 		:param rename: Whether to rename files to new_filename(video)
 		"""
-		await self.download(videos, keys, download, delete)
-		await self.merge_and_rename(videos, keys, add_attachments, merge, rename)
+
+		await self.download(videos, [*keys, 'download'], download, delete)
+		await self.merge_and_rename(videos, [*keys, 'merge'], add_attachments, merge, rename)
 
 	class NewTaskMessage:
 		def __init__(self, command=None, total_items=None, total_bytes=None):
@@ -271,24 +318,6 @@ def filter_videos(all_videos, *expected_result_classes):
 	return [x for x in all_videos if x['result'].split('_')[0] in expected_result_classes]
 
 
-def remove_ext(path):
-	first = os.path.splitext(path)
-	# handle .info.json, .rechat.json, etc.
-	if first[1] == '.json':
-		second = os.path.splitext(first[0])
-		return second[0] if 3 <= len(second[1]) <= 8 else first[0]
-	return first[0]
-
-
-def ext(path):
-	first = os.path.splitext(path)
-	# handle .info.json, .rechat.json, etc.
-	if first[1] == '.json':
-		second = os.path.splitext(first[0])
-		return second[1][1:] + first[1] if 3 <= len(second[1]) <= 8 else first[1][1:]
-	return first[1][1:]
-
-
 def new_filename(video):
 	"""
 	Determine the appropriate output filename for a video. It can be in any of these formats:
@@ -315,12 +344,36 @@ def new_filename(video):
 	:param video:
 	:return: The path where the video should be placed after being downloaded, without extension
 	"""
-	raise NotImplementedError("Dunno")
+	se_format = False if not video['Output Title'] else (
+			video['Series'] and re.match(r'^S\d{2,}E\d{2,} ', video['Output Title']))
+	if not (video['Group'] and (video['Date'] or se_format)):
+		# Cannot determine an appropriate output filename
+		return remove_ext(video['Filename'])
+
+	output_filename = video['Group'] + '/'
+	if se_format:
+		output_filename += video['Output Title']
+	else:
+		if video['Series']:
+			output_filename += video['Series'] + '/'
+
+		date = video['Date'].strip()
+		output_filename += f"{date[0:4]}-{date[4:6]}-{date[6:8]}"
+
+		if video['Episode']:
+			output_filename += f" - Episode {video['Episode']}"
+
+		if video['Output Title']:
+			output_filename += f" - {video['Output Title']}"
+
+	if video['Part']:
+		output_filename += f" - Part {video['Part']}"
+	return output_filename
 
 
 def filename_map(videos, rename=True):
 	"""
-	Create a filename mapping from old paths to new paths according to new_filename,
+	Create a filename mapping from new paths to old paths according to new_filename,
 	excluding file extensions.
 	:param videos: List of videos
 	:param rename: If false, this only deals with other_path.

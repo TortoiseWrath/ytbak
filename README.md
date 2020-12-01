@@ -110,10 +110,8 @@ up a cron job to do so on the VPS where this is running.
 
 Once videos are downloaded, I run these locally to figure out what to do with them.
 
-Dependencies for some of these: `bash`, python 3.9+, `jq`, `rclone`, `rsync`, `git`, `ffmpeg`, 
-[`youtube-dl`](https://github.com/ytdl-org/youtube-dl), 
-[MKVToolNix](https://mkvtoolnix.download/downloads.html),
-[`writetape`](https://github.com/TortoiseWrath/shelf-of-interesting-items/blob/master/writetape)
+Dependencies: `bash`, python 3.9+, `jq`, `rclone`, `rsync`, `git`, `ffmpeg`, 
+[`youtube-dl`](https://github.com/ytdl-org/youtube-dl)
 
 `rclone` and `rsync` are used by `download_server_metadata` which should be modified appropriately
 
@@ -195,7 +193,7 @@ Once I've figured out what to do with the videos with the help of the client pro
 
 Dependencies: `bash`, `python` 3.7+, [`pipenv`](https://pypi.org/project/pipenv/), `rclone`, `ffmpeg`, 
 [`youtube-dl`](https://github.com/ytdl-org/youtube-dl), 
-[MKVToolNix](https://mkvtoolnix.download/downloads.html), imagemagick
+[MKVToolNix](https://mkvtoolnix.download/downloads.html), imagemagick, `gtar`
 
 Set up venv with `pipenv install`, then run with `pipenv shell` (on FreeBSD I had to use `LC_ALL=C.UTF-8 LANG=C.UTF-8 pipenv shell`)
 and `python downloader.py` or `python downtape.py`.
@@ -269,28 +267,33 @@ General logging output can be teed to a file with `--log-output`.
 
 Note when writing this: https://unix.stackexchange.com/questions/346853/tar-list-files-break-on-first-file
 
-Once I have results from `categorize.py`, I manually split the ones I _don't_ want to keep on my server into volumes with
+Arguments:
+* The path to a directory containing csv files of the same type used by download.py (with `-t` option for tab-separated)
+* `-o`, `--output-directory` - path to an output directory (ideally 2 or more)
+* `-f tapedrive` - tape drive device name (e.g. `/dev/sa0`)
+* `-s`, `--storage` - where to keep files with a falsy value of `alive` (if omitted, they are kept only on the tape)
+
+Once I have results from `categorize.py`, I manually split the videos into volumes with
 the size of archival tapes, and use this to semi-automate the archival process.
 
 Takes as an argument a directory full of input CSV files, which are handled in order by filename.
 
-Runs the equivalent of `download.py -k` on the first one to download the files with the result `keep` into the directory 1/,
-then runs `writetape` to write the downloaded files to tape and delete the local files.
+Runs the equivalent of `download.py -k` on the first file to download the files with the result `keep` into the
+first given output directory. Once download is complete, copies any files with falsy `alive` values to the location
+given by `-s` (if applicable), then writes them to the tape drive given by `-f` using `gtar`, deleting the source files.
 
-While that tape is being written, it runs `download.py -k` on the next input file and saves them to 2/, etc.
+While that tape is being written, download files from the next input file to the next storage directory.
 
-You can put other files in 1/, 2/, etc. before running this, to include things like the results of `download.py -m`. 
+When there are more input files than storage directories, it wraps around (videos from the kth input file are downloaded
+to directory n mod k where n is the number of directories), but no download will start while that output directory is
+being used either by the download or write-tape stages of another input file.
 
-After writing a tape, it ejects the tape, deletes the files from the server with `download.py -Dk`, and waits until the next tape is inserted to start writing another one.
+With two output directories, for example, no more than two input files will be processed at a time.
 
-Before writing a tape, it makes sure the tape is blank. If the tape is not blank, it prompts and waits.
+After writing a tape, it ejects the tape. Before writing a tape, it makes sure a tape is inserted and is blank.
+If neither condition is true, the tape-writing stage stalls. This is polled again every 10 seconds.
 
-If free disk space drops below 1 TB, it stops downloading until enough tapes have been written that the free space is at least 1.5 TB. (this makes sense because I'm using LTO-3 tapes at the moment)
-
-The option `-t` means it treats the input files as tab-separated UTF-16 rather than comma-separated UTF-8.
-
-If `--copy-dead-to` is specified, files with alive=False (or a non-None falsy value) in the input file are copied to the specified destination 
-before writing to tape. The destination specified is passed to rclone so should be in rclone format.
+When a storage location is given, it is passed to `rclone` so should be in the appropriate format.
 
 Note: Budget 200 KB extra per video on the tape, for thumbnails + info.json + overhead + shenanigans
 
@@ -327,7 +330,7 @@ includes these as attachments.
 If there's nothing to merge into an existing mkv file, it doesn't do any merging and just moves it to the directory
 specified by -o. 
 
-To merge all files in a directory with their attachments, do something like
+To merge all files in a directory with matching attachments in the same directory, do something like
 `find /videos -type f -name "*.mp4" -exec python3 merge.py -o /videos {} \;`.
 
 ## Credits & license
