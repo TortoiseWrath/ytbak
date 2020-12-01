@@ -38,7 +38,7 @@ def _create_filter_files(videos, include_videos=True, include_thumbnails=True,
 			if v['other_server'] not in filter_map:
 				filter_map[v['other_server']] = []
 			filter_map[v['other_server']].append(
-				f"/{re.escape(remove_ext(v['other_path']))}.{{{','.join(extensions)}}}\n")
+				f"/{re.escape(remove_ext(v['other_path']))}.{{{','.join(add_extensions)}}}\n")
 
 	filter_files = {}  # server -> filename
 	for server, filters in filter_map.items():
