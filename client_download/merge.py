@@ -59,8 +59,12 @@ def merge(source_files, audio_files, video_files, subtitle_files, output_filenam
 	          if file == cover else ('--attach-file', file))]
 
 	args += source_files
-	args += [arg for file in audio_files for arg in ('-D', file)]
 	args += [arg for file in video_files for arg in ('-A', file)]
+	if len(audio_files) > 1:
+		args += ['-D', '--default-track', '-1:1', audio_files[0]]
+		args += [arg for file in audio_files[1:] for arg in ('-D', file)]
+	else:
+		args += [arg for file in audio_files for arg in ('-D', file)]
 	args += [arg for file in subtitle_files for arg in ('-A', '-D', file)]
 
 	files_to_delete = set()

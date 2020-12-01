@@ -295,7 +295,7 @@ If neither condition is true, the tape-writing stage stalls. This is polled agai
 
 When a storage location is given, it is passed to `rclone` so should be in the appropriate format.
 
-Note: Budget 200 KB extra per video on the tape, for thumbnails + info.json + overhead + shenanigans
+Note: Budget 250 KB extra per video on the tape, for thumbnails + info.json + overhead + shenanigans
 
 ### downloader.py
 

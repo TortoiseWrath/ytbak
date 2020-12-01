@@ -35,6 +35,11 @@ def _create_filter_files(videos, include_videos=True, include_thumbnails=True,
 			filter_map[v['Server']] = []
 		filter_map[v['Server']].append(
 			f"/{re.escape(remove_ext(v['Filename']))}.{{{','.join(extensions)}}}\n")
+		if v['other_server']:
+			if v['other_server'] not in filter_map:
+				filter_map[v['other_server']] = []
+			filter_map[v['other_server']].append(
+				f"/{re.escape(remove_ext(v['other_path']))}.{{{','.join(extensions)}}}\n")
 
 	filter_files = {}  # server -> filename
 	for server, filters in filter_map.items():
@@ -233,18 +238,22 @@ class Downloader:
 
 		for target, sources in destinations.items():
 			if len(sources):
+				av_files = [self.output_dir + '/' + x['Filename'] for x in sources if
+				            x['result'].startswith('keep') or x['result'] == 'audio+video']
+				video_files = [self.output_dir + '/' + x['Filename'] for x in sources if
+				               x['result'] in ['video', 'video+subs']]
+				audio_files = [self.output_dir + '/' + x['Filename'] for x in sources if
+				               x['result'] in ['audio', 'audio+subs']] \
+				              + video_files  # include all audio tracks
 				merge_videos(
-					source_files=[self.output_dir + '/' + x['Filename'] for x in sources if
-					              x['result'].startswith('keep') or x['result'] == 'audio+video'],
-					audio_files=[self.output_dir + '/' + x['Filename'] for x in sources if
-					             x['result'] in ['audio', 'audio+subs']],
-					video_files=[self.output_dir + '/' + x['Filename'] for x in sources if
-					             x['result'] in ['video', 'video+subs']],
+					source_files=av_files,
+					audio_files=audio_files,
+					video_files=video_files,
 					subtitle_files=[self.output_dir + '/' + x['Filename'] for x in sources if
 					                x['result'] in ['subs', 'audio+subs', 'video+subs']],
 					output_filename=self.output_dir + '/' + target + '.mkv',
 					delete_source=True,
-					delete_json=False,
+					delete_json=True,  # json will not be deleted from server, only destination
 					dry_run=self.dry_run,
 					title=sources[0]['Output Title'],
 					pub=self.publisher, keys=[*keys, 'merge']
@@ -252,6 +261,9 @@ class Downloader:
 				self.output_file.writerows([[x['Filename'], target + '.mkv'] for x in sources])
 			self.__pub(self.ProgressMessage("Merged: " + target, processed_items=1),
 			           [*keys, 'merge'])
+
+		# ugly hack to get rid of empty directories created in this process
+		subprocess.run(['find', self.output_dir, '-type', 'd', '-empty', '-delete'])
 
 		self.__pub(self.CompletedMessage(), keys)
 
