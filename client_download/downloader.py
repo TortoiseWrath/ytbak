@@ -390,4 +390,5 @@ def new_filename(video):
 
 def sanitize(input):
 	return ''.join(c if c not in r'<>:"/\|?*' and '\u0020' <= c <= '\uFFFF' else (
-		' -' if c == ':' else '_') for c in unicodedata.normalize('NFC', input)).strip()
+		' -' if c == ':' else ("'" if c == '"' else '_')) for c in
+	               unicodedata.normalize('NFC', input)).strip()
