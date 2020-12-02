@@ -365,7 +365,7 @@ def new_filename(video):
 		output_filename += sanitize(video['Output Title'])
 	else:
 		if video['Series']:
-			output_filename += video['Series'] + '/'
+			output_filename += sanitize(video['Series'], slash='') + '/'
 
 		date = video['Date'].strip()
 		if not re.match(r'^\d{8}$', date):
@@ -383,7 +383,7 @@ def new_filename(video):
 	return output_filename
 
 
-def sanitize(input):
-	return ''.join(c if c not in r'<>:"/\|?*' and '\u0020' <= c <= '\uFFFF' else (
+def sanitize(input, slash='/'):
+	return ''.join(c if c not in (r'<>:"\|?*' + slash) and '\u0020' <= c <= '\uFFFF' else (
 		' -' if c == ':' else ("'" if c == '"' else '_')) for c in
 	               unicodedata.normalize('NFC', input)).strip()
