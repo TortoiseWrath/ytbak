@@ -45,6 +45,12 @@ def merge(source_files, audio_files, video_files, subtitle_files, output_filenam
 	video_files = video_files or []
 	subtitle_files = subtitle_files or []
 
+	if os.path.isfile(output_filename):
+		i = 1
+		while os.path.isfile(f"{remove_ext(output_filename)}_{i}.{ext(output_filename)}"):
+			i += 1
+		output_filename = f"{remove_ext(output_filename)}_{i}.{ext(output_filename)}"
+
 	output = 'temp.mkv' if output_filename in (source_files + audio_files + video_files +
 	                                           subtitle_files) else output_filename
 
