@@ -380,6 +380,10 @@ def new_filename(video):
 
 	if video['Part']:
 		output_filename += f" - Part {sanitize(video['Part'])}"
+
+	while output_filename.endswith('.'):
+		output_filename = output_filename[:-1]
+
 	return output_filename
 
 
