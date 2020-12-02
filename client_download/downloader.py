@@ -34,11 +34,6 @@ def _create_filter_files(videos, include_videos=True, include_thumbnails=True,
 			filter_map[v['Server']] = []
 		filter_map[v['Server']].append(
 			f"/{re.escape(remove_ext(v['Filename']))}.{{{','.join(extensions)}}}\n")
-		if v['other_server']:
-			if v['other_server'] not in filter_map:
-				filter_map[v['other_server']] = []
-			filter_map[v['other_server']].append(
-				f"/{re.escape(remove_ext(v['other_path']))}.{{{','.join(add_extensions)}}}\n")
 
 	filter_files = {}  # server -> filename
 	for server, filters in filter_map.items():
@@ -323,7 +318,7 @@ def read_source_file(filename, tsv=False):
 		reader = csv.DictReader(csvfile, dialect='excel-tab' if tsv else 'excel')
 		videos = list(reader)
 	for expected_key in ('Server', 'Filename', 'Size', 'Date', 'Duration', 'Group', 'Series',
-	                     'Episode', 'Output Title', 'Part', 'result', 'other_path', 'other_server'):
+	                     'Episode', 'Output Title', 'Part', 'result'):
 		if expected_key not in videos[0]:
 			raise ValueError(f"Did not find key {expected_key} in vidinfo csv. values: {videos[0]}")
 	return videos

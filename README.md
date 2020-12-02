@@ -232,8 +232,6 @@ If you've used `download_server_metadata`, make sure to include the new location
 The thumbnail and info.json are added as attachments to the mkv file after it is downloaded. 
 (non-mkv video files are remuxed into an mkv file)
 
-If `other_server` and `other_path` are given in the csv, it will include thumbnails and info.json from those too. 
-
 Thumbnail files are deleted by `-d` and `-D`, but info.json files are not.
 
 The output filename is decided by the additional metadata fields in the csv. It can be in any of these formats:

@@ -7,41 +7,6 @@ import view
 from downloader import Downloader, filter_videos, read_source_file
 
 
-# * `-d`: Deletes files in the input with the result `delete`
-# * `-D`: Deletes files in the input csv from the server that would otherwise be downloaded
-# * `-k`: Downloads files with the results `keep`, `keep_audio`, etc.
-# * `-a`: Downloads files with the results `archive_audio`, `archive_video+subs`, etc.
-# * `-i`: Downloads files with the result `inspect`
-# * `-m`: Downloads and merges files with the results `audio`, `audio+subs`, `video`, `video+subs`, `audio+video`, and `subs`
-# * `-t`: Interpret the input files as tab-separated UTF-16 rather than comma-separated UTF-8.
-#
-# To download files and delete them from the server, run for example `download.py -k` followed by `download.py -Dk`.
-#  `downtape.py` does this, with a `writetape` in the middle.
-#
-# The server is found from the `Server` column in the csv file. Pass `--server-map`, which should
-# map server names to rclone server names (one-to-many):
-# ```
-# octopus,/bucket/archives/dl
-# octopus,panray:projects/rtbak/dl/meta/metadata
-# wasabi,wasabi-us:sdg-spout
-# wasabi,wasabi-eu:eurospout
-# wasabi,panray:projects/rtbak/dl/meta/metadata
-# ```
-# It checks for the video file and corresponding info.json and thumbnail on each server matching `Server`.
-#
-# If you've used `download_server_metadata`, make sure to include the new location of the metadata files as a possible server.
-#
-# The thumbnail and info.json are added as attachments to the mkv file after it is downloaded.
-# (non-mkv video files are remuxed into an mkv file)
-#
-# If `other_server` and `other_path` are given in the csv, it will include thumbnails and info.json from those too.
-#
-# Thumbnail files are deleted by `-d` and `-D`, but info.json files are not.
-#
-# The mappings from original filenames to renamed filenames (many-to-one, in case of `-m`) in a log file specified by `-o`.
-#
-# (This way the metadata left behind can be matched to the stored video files later.)
-
 async def download(args, hub):
 	downloader = Downloader(hub=hub, prefix='dl', output_dir=args.output,
 	                        output_file=args.map_output,
