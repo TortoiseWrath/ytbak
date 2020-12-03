@@ -236,20 +236,24 @@ class Downloader:
 				audio_files = [self.output_dir + '/' + x['Filename'] for x in sources if
 				               x['result'] in ['audio', 'audio+subs']] \
 				              + video_files  # include all audio tracks
-				merge_videos(
-					source_files=av_files,
-					audio_files=audio_files,
-					video_files=video_files,
-					subtitle_files=[self.output_dir + '/' + x['Filename'] for x in sources if
-					                x['result'] in ['subs', 'audio+subs', 'video+subs']],
-					output_filename=self.output_dir + '/' + target + '.mkv',
-					delete_source=True,
-					delete_json=True,  # json will not be deleted from server, only destination
-					dry_run=self.dry_run,
-					title=sources[0]['Output Title'],
-					pub=self.publisher, keys=[*keys, 'merge']
-				)
-				self.output_file.writerows([[x['Filename'], target + '.mkv'] for x in sources])
+				try:
+					merge_videos(
+						source_files=av_files,
+						audio_files=audio_files,
+						video_files=video_files,
+						subtitle_files=[self.output_dir + '/' + x['Filename'] for x in sources if
+						                x['result'] in ['subs', 'audio+subs', 'video+subs']],
+						output_filename=self.output_dir + '/' + target + '.mkv',
+						delete_source=True,
+						delete_json=True,  # json will not be deleted from server, only destination
+						dry_run=self.dry_run,
+						title=sources[0]['Output Title'],
+						pub=self.publisher, keys=[*keys, 'merge']
+					)
+					self.output_file.writerows([[x['Filename'], target + '.mkv'] for x in sources])
+				except Exception as ex:
+					self.__pub(ex, keys)
+					pass
 			self.__pub(self.ProgressMessage("Merged: " + target, processed_items=1),
 			           [*keys, 'merge'])
 
