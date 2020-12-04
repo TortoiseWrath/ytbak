@@ -5,6 +5,7 @@ import aiopubsub
 import argparse
 import os
 import subprocess
+import uuid
 
 
 def find_attachments(*filenames):
@@ -27,9 +28,8 @@ def merge(source_files, audio_files, video_files, subtitle_files, output_filenam
 	if not cover:
 		cover = next((a for a in attachments if ext(a) in IMAGE_FILES), None)
 		if cover:
-			if os.path.isfile('cover.jpg'):
-				raise RuntimeError("cover.jpg already exists in current directory")
-			imagick_args = ['convert', cover, 'cover.jpg']
+			temp_filename = str(uuid.uuid4()) + '.jpg'
+			imagick_args = ['convert', cover, temp_filename]
 			print(' '.join(map(shlex.quote, imagick_args)))
 			if not dry_run:
 				result = subprocess.run(imagick_args)
@@ -37,8 +37,8 @@ def merge(source_files, audio_files, video_files, subtitle_files, output_filenam
 					raise RuntimeError("Got non-zero exit code from convert")
 			created_cover = True
 			cover_source = cover
-			cover = 'cover.jpg'
-			attachments.add('cover.jpg')
+			cover = temp_filename
+			attachments.add(temp_filename)
 
 	source_files = source_files or []
 	audio_files = audio_files or []
@@ -80,7 +80,7 @@ def merge(source_files, audio_files, video_files, subtitle_files, output_filenam
 	if delete_json:
 		files_to_delete.update([x for x in attachments if x.endswith('.json')])
 	if created_cover:
-		files_to_delete.add('cover.jpg')
+		files_to_delete.add(cover)
 
 	pub.publish(aiopubsub.Key(*keys), ' '.join(map(shlex.quote, args)))
 	if not dry_run:
