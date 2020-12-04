@@ -8,6 +8,24 @@ import subprocess
 import uuid
 
 
+def remove_ext(path):
+	first = os.path.splitext(path)
+	# handle .info.json, .rechat.json, etc.
+	if first[1] == '.json':
+		second = os.path.splitext(first[0])
+		return second[0] if 3 <= len(second[1]) <= 8 else first[0]
+	return first[0]
+
+
+def ext(path):
+	first = os.path.splitext(path)
+	# handle .info.json, .rechat.json, etc.
+	if first[1] == '.json':
+		second = os.path.splitext(first[0])
+		return second[1][1:] + first[1] if 3 <= len(second[1]) <= 8 else first[1][1:]
+	return first[1][1:]
+
+
 def find_attachments(*filenames):
 	return {attachment for attachments
 	        in [glob.glob(glob.escape(remove_ext(filename)) + '.*') for filename in filenames]
@@ -151,24 +169,5 @@ def main():
 
 if __name__ == "__main__":
 	main()
-
-
-def remove_ext(path):
-	first = os.path.splitext(path)
-	# handle .info.json, .rechat.json, etc.
-	if first[1] == '.json':
-		second = os.path.splitext(first[0])
-		return second[0] if 3 <= len(second[1]) <= 8 else first[0]
-	return first[0]
-
-
-def ext(path):
-	first = os.path.splitext(path)
-	# handle .info.json, .rechat.json, etc.
-	if first[1] == '.json':
-		second = os.path.splitext(first[0])
-		return second[1][1:] + first[1] if 3 <= len(second[1]) <= 8 else first[1][1:]
-	return first[1][1:]
-
 
 IMAGE_FILES = ['jpg', 'webp', 'png', 'jpeg', 'gif', 'jfif']
