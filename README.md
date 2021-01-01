@@ -138,6 +138,11 @@ data connection; you can copy the imported data to another worksheet then import
 file by refreshing the connection. Then, save the updated worksheet as "Unicode Text (*.txt)" for processing by
 categorize.py, download.py, and downtape.py and pass `-t` to these scripts to handle tab-separated files.
 
+```
+python download.py -t /bucket/final/14.txt --server-map /backup/temp/server_map.csv --map-output /backup/temp/filemap.csv --log-otput /backup/temp/14_deletion_log -o /backup/temp/rtbak/14 -kD
+
+```
+
 ### download_server_metadata
 
 This downloads `info.json` files from the servers configured in the script, removing them from the servers.

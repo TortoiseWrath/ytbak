@@ -129,7 +129,7 @@ class Downloader:
 						# Something happened to a video file so add it to the totals
 						items = 1
 						if video_sizes:
-							size = video_sizes[file]
+							size = video_sizes.get(file, 0)
 				elif log_level == 'DEBUG':
 					# Ignore the unimportant debug message
 					continue
